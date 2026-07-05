@@ -12,7 +12,7 @@ There is no root `package.json`. Run frontend and backend commands from their ow
 
 ## Frontend
 
-Current status: initial UI prototype with dummy data only. Backend APIs are not connected yet.
+Current status: initial UI prototype with auth, public event browsing, event detail, admin event management, Cloudinary poster uploads, Redis seat locking, booking confirmation, QR tickets, confirmation emails, and My Bookings connected to the backend.
 
 ```bash
 cd frontend
@@ -25,37 +25,94 @@ Included UI screens:
 - Home and event discovery
 - Search/filter events
 - Event details with dummy seat selection
+- Event details with Redis-backed temporary seat locking for database events
 - Login/register UI
-- My bookings
+- My bookings with QR ticket display
 - Admin dashboard
 - Manage events
+- Cloudinary-backed event poster upload
+
+Frontend environment:
+
+```bash
+VITE_API_BASE_URL=http://localhost:5000/api
+```
 
 ## Backend
 
-Current status: backend environment, app bootstrap, MongoDB, Redis, Cloudinary, email, cache, and seat-lock config are scaffolded.
+Current status: backend environment, app bootstrap, MongoDB, Redis, Cloudinary, email, cache, seat-lock config, data models, and auth APIs are scaffolded.
 
 ```bash
 cd backend
 npm install
 copy .env.example .env
 npm run dev
+npm test
 ```
 
 `npm run dev` starts `src/server.js`, connects MongoDB, connects Redis, and exposes a health endpoint at `GET /health`.
+
+Auth endpoints:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+Event endpoints:
+
+- `GET /api/events`
+- `GET /api/events/:eventIdOrSlug`
+- `GET /api/events/admin/manage`
+- `POST /api/events/poster`
+- `POST /api/events`
+- `PATCH /api/events/:eventId`
+- `PATCH /api/events/:eventId/publish`
+- `PATCH /api/events/:eventId/cancel`
+- `DELETE /api/events/:eventId`
+- `GET /api/events/:eventId/seats`
+
+Seat-lock endpoints:
+
+- `POST /api/bookings/lock-seat`
+- `POST /api/bookings/release-seat`
+
+Booking endpoints:
+
+- `POST /api/bookings`
+- `GET /api/bookings/my`
+
+Admin endpoints:
+
+- `GET /api/admin/dashboard`
+
+## Postman
+
+Import these files into Postman:
+
+- `postman/Event Booking Platform.postman_collection.json`
+- `postman/Event Booking Platform.postman_environment.json`
+
+The login/register requests automatically save the returned JWT into the `token` environment variable. The create event request saves `eventId` and `eventSlug`.
+
+Admin bootstrap:
+
+Set `ADMIN_EMAILS` in `backend/.env` before registering an admin user.
+
+```bash
+ADMIN_EMAILS=your-email@example.com
+```
+
+Then register with that same email from the frontend. That user will be created with the `admin` role.
 
 Required local services for the backend server:
 
 - MongoDB at `MONGO_URI`
 - Redis at `REDIS_URL`
 
-Cloudinary and SMTP variables can stay blank until poster uploads and confirmation emails are implemented.
+Cloudinary variables are required for poster uploads. SMTP variables are optional in development; confirmation emails are skipped if SMTP is not configured.
 
 Planned backend features:
 
-- JWT authentication
-- Mongoose models
-- Redis seat locks and caching
-- Rate-limited auth and booking routes
-- QR ticket generation
-- Zod validation
-- Poster uploads and booking emails later
+- Payment integration
+- Broader integration tests for auth, events, locks, and bookings
