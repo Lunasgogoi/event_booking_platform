@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  color: #111827;
-  background: #f8fafc;
+  color: #17201d;
+  background: #f4f7f6;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -40,4 +40,195 @@ img {
 
 #root {
   min-height: 100vh;
+}
+
+html:not(.theme-dark-root),
+html:not(.theme-dark-root) body {
+  background: #f4f7f6;
+}
+
+html:not(.theme-dark-root) .bg-slate-50 {
+  background-color: #f4f7f6;
+}
+
+html:not(.theme-dark-root) .bg-white,
+html:not(.theme-dark-root) .bg-white\/95 {
+  background-color: rgba(253, 254, 252, 0.96);
+}
+
+html:not(.theme-dark-root) .bg-slate-100 {
+  background-color: #e9efed;
+}
+
+html:not(.theme-dark-root) .bg-slate-200 {
+  background-color: #d9e3df;
+}
+
+html:not(.theme-dark-root) .border-slate-200,
+html:not(.theme-dark-root) .border-slate-300 {
+  border-color: #dce6e2;
+}
+
+html:not(.theme-dark-root) .text-slate-950 {
+  color: #17201d;
+}
+
+html:not(.theme-dark-root) .text-slate-700 {
+  color: #35433e;
+}
+
+html:not(.theme-dark-root) .text-slate-600 {
+  color: #4f5f5a;
+}
+
+html:not(.theme-dark-root) .text-slate-500 {
+  color: #697973;
+}
+
+html:not(.theme-dark-root) .shadow-sm,
+html:not(.theme-dark-root) .shadow,
+html:not(.theme-dark-root) .shadow-md,
+html:not(.theme-dark-root) .shadow-2xl {
+  box-shadow: 0 18px 44px rgba(28, 45, 39, 0.08);
+}
+
+html:not(.theme-dark-root) .hover\:bg-slate-50:hover,
+html:not(.theme-dark-root) .hover\:bg-slate-100:hover,
+html:not(.theme-dark-root) .hover\:bg-slate-200:hover {
+  background-color: #edf3f1;
+}
+
+.theme-dark-root,
+.theme-dark-root body {
+  background: #0b0f16;
+  color-scheme: dark;
+}
+
+.theme-dark {
+  background:
+    radial-gradient(circle at top left, rgba(225, 29, 72, 0.08), transparent 30rem),
+    linear-gradient(180deg, #0b0f16 0%, #10151f 45%, #0b0f16 100%);
+  color: #e5e7eb;
+}
+
+.theme-dark .bg-white,
+.theme-dark .bg-white\/95 {
+  background-color: rgba(22, 27, 34, 0.96);
+}
+
+.theme-dark .bg-slate-50 {
+  background-color: #111827;
+}
+
+.theme-dark .bg-slate-100 {
+  background-color: #1f2937;
+}
+
+.theme-dark .bg-slate-200 {
+  background-color: #263241;
+}
+
+.theme-dark .bg-slate-900,
+.theme-dark .bg-slate-950 {
+  background-color: #070b12;
+}
+
+.theme-dark .border-slate-200,
+.theme-dark .border-slate-300,
+.theme-dark .border-slate-400 {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.theme-dark .border-rose-200 {
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.theme-dark .text-slate-950 {
+  color: #f8fafc;
+}
+
+.theme-dark .text-slate-700,
+.theme-dark .text-slate-600 {
+  color: #cbd5e1;
+}
+
+.theme-dark .text-slate-500 {
+  color: #94a3b8;
+}
+
+.theme-dark .text-slate-400 {
+  color: #64748b;
+}
+
+.theme-dark .text-rose-600,
+.theme-dark .text-rose-700 {
+  color: #fb7185;
+}
+
+.theme-dark .text-emerald-700 {
+  color: #6ee7b7;
+}
+
+.theme-dark .text-amber-700 {
+  color: #fbbf24;
+}
+
+.theme-dark .bg-rose-50 {
+  background-color: rgba(225, 29, 72, 0.13);
+}
+
+.theme-dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.13);
+}
+
+.theme-dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.13);
+}
+
+.theme-dark .bg-slate-950.text-white,
+.theme-dark .bg-rose-600,
+.theme-dark .bg-slate-950 {
+  color: #ffffff;
+}
+
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea {
+  color: #f8fafc;
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+  color: #64748b;
+}
+
+.theme-dark option {
+  background-color: #111827;
+  color: #f8fafc;
+}
+
+.theme-dark .shadow-sm,
+.theme-dark .shadow,
+.theme-dark .shadow-md,
+.theme-dark .shadow-2xl {
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+}
+
+.theme-dark .hover\:bg-slate-50:hover,
+.theme-dark .hover\:bg-slate-100:hover,
+.theme-dark .hover\:bg-slate-200:hover {
+  background-color: #243041;
+}
+
+.theme-dark .hover\:border-slate-300:hover,
+.theme-dark .hover\:border-slate-400:hover {
+  border-color: rgba(203, 213, 225, 0.35);
+}
+
+.theme-dark .hover\:text-slate-950:hover {
+  color: #ffffff;
+}
+
+.theme-dark table tbody tr:hover {
+  background-color: rgba(148, 163, 184, 0.06);
 }

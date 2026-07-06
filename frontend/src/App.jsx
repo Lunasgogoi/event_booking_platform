@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast, { Toaster } from 'react-hot-toast'
@@ -6,16 +6,23 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   CreditCard,
   Edit3,
   Filter,
   Heart,
+  Info,
   ListChecks,
+  LogOut,
+  Mail,
   MapPin,
   Menu,
+  Moon,
   Plus,
   Search,
+  Settings,
+  Sun,
   Ticket,
   User,
   Users,
@@ -27,6 +34,7 @@ import api from './services/api'
 import { getApiErrorMessage } from './services/api'
 
 const categories = ['All', 'Music', 'Comedy', 'Business', 'Sports', 'Food']
+const supportEmail = 'support@ticketo.events'
 
 function getCategoryPath(category) {
   return category === 'All' ? '/events' : `/events?category=${encodeURIComponent(category)}`
@@ -93,16 +101,96 @@ function formatINR(value) {
   return `INR ${Number(value || 0).toLocaleString('en-IN')}`
 }
 
+function formatDuration(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function getUserInitial(user) {
+  const source = user?.name || user?.email || 'User'
+  return source.trim().charAt(0).toUpperCase()
+}
+
+function getAvatarUrl(user) {
+  return user?.avatar?.url || user?.avatarUrl || ''
+}
+
+function getSupportMailto(user, context = 'Ticketo event support request') {
+  const bodyLines = [
+    'Hi Ticketo team,',
+    '',
+    'I need help with:',
+    '',
+    'Event or booking reference:',
+    '',
+    user?.email ? `Account email: ${user.email}` : '',
+    '',
+    'Thanks,',
+  ].filter((line) => line !== '')
+
+  return `mailto:${supportEmail}?subject=${encodeURIComponent(context)}&body=${encodeURIComponent(bodyLines.join('\n'))}`
+}
+
+function getCurrentTimestamp() {
+  return Date.now()
+}
+
+function getInitialTheme() {
+  const savedTheme = window.localStorage.getItem('ticketo-theme')
+
+  if (savedTheme === 'dark' || savedTheme === 'light') {
+    return savedTheme
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 function App() {
+  const [theme, setTheme] = useState(getInitialTheme)
+  const isDark = theme === 'dark'
+
+  useEffect(() => {
+    window.localStorage.setItem('ticketo-theme', theme)
+    document.documentElement.classList.toggle('theme-dark-root', isDark)
+  }, [isDark, theme])
+
+  function toggleTheme() {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
-      <Toaster position="top-right" toastOptions={{ duration: 2400 }} />
-      <Shell>
+    <div className={`min-h-screen ${isDark ? 'theme-dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'}`}>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 2400,
+          style: isDark
+            ? {
+                background: '#161b22',
+                border: '1px solid rgba(148, 163, 184, 0.18)',
+                color: '#e5e7eb',
+              }
+            : undefined,
+        }}
+      />
+      <Shell theme={theme} onToggleTheme={toggleTheme}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
+          <Route
+            path="/settings"
+            element={(
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route
             path="/admin"
             element={(
@@ -127,6 +215,24 @@ function App() {
   )
 }
 
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, isBootstrapping } = useAuth()
+
+  if (isBootstrapping) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <p className="text-sm font-semibold text-slate-500">Checking access...</p>
+      </main>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return children
+}
+
 function AdminRoute({ children }) {
   const { isAuthenticated, isBootstrapping, user } = useAuth()
 
@@ -149,9 +255,129 @@ function AdminRoute({ children }) {
   return children
 }
 
-function Shell({ children }) {
+function ThemeToggle({ isDark, onToggleTheme }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggleTheme}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="grid h-10 w-10 place-items-center rounded border border-slate-300 text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+    >
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  )
+}
+
+function ProfileMenu({ user, onLogout }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef(null)
+  const avatarUrl = getAvatarUrl(user)
+  const initial = getUserInitial(user)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    function handlePointerDown(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  function closeMenu() {
+    setIsOpen(false)
+  }
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((value) => !value)}
+        className="inline-flex h-10 items-center gap-2 rounded border border-slate-300 bg-white px-1.5 pr-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label="Open profile menu"
+      >
+        <span className="grid h-8 w-8 overflow-hidden rounded-full bg-slate-950 text-white">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="grid h-full w-full place-items-center text-sm font-semibold">{initial}</span>
+          )}
+        </span>
+        <ChevronDown size={16} className={`transition ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div
+          role="menu"
+          className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded border border-slate-200 bg-white shadow-2xl"
+        >
+          <div className="border-b border-slate-200 px-4 py-3">
+            <p className="truncate text-sm font-semibold text-slate-950">{user?.name || 'Ticketo user'}</p>
+            <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{user?.email}</p>
+          </div>
+          <div className="p-2">
+            <ProfileMenuLink to="/settings" icon={Settings} label="Settings" onClick={closeMenu} />
+            <ProfileMenuLink to="/about" icon={Info} label="About us" onClick={closeMenu} />
+            <ProfileMenuLink to="/contact" icon={Mail} label="Contact us" onClick={closeMenu} />
+          </div>
+          <div className="border-t border-slate-200 p-2">
+            <button
+              type="button"
+              onClick={() => {
+                closeMenu()
+                onLogout()
+              }}
+              className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
+              role="menuitem"
+            >
+              <LogOut size={17} />
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProfileMenuLink({ to, icon: Icon, label, onClick }) {
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+      role="menuitem"
+    >
+      <Icon size={17} className="text-slate-400" />
+      {label}
+    </Link>
+  )
+}
+
+function Shell({ children, theme, onToggleTheme }) {
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
   const { isAuthenticated, logout, user } = useAuth()
+  const isDark = theme === 'dark'
 
   const links = [
     { to: '/events', label: 'Events' },
@@ -162,6 +388,7 @@ function Shell({ children }) {
   async function handleLogout() {
     try {
       await logout()
+      navigate('/')
       toast.success('Logged out successfully')
     } catch (error) {
       toast.error(getApiErrorMessage(error))
@@ -196,17 +423,9 @@ function Shell({ children }) {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
+            <ThemeToggle isDark={isDark} onToggleTheme={onToggleTheme} />
             {isAuthenticated ? (
-              <>
-                <span className="max-w-40 truncate text-sm font-medium text-slate-600">{user?.name}</span>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-                >
-                  Logout
-                </button>
-              </>
+              <ProfileMenu user={user} onLogout={handleLogout} />
             ) : (
               <>
                 <Link
@@ -248,17 +467,63 @@ function Shell({ children }) {
                   {link.label}
                 </NavLink>
               ))}
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                {isDark ? <Sun size={17} /> : <Moon size={17} />}
+                {isDark ? 'Light mode' : 'Dark mode'}
+              </button>
               {isAuthenticated ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    handleLogout()
-                  }}
-                  className="rounded px-3 py-2 text-left text-sm font-semibold"
-                >
-                  Logout
-                </button>
+                <>
+                  <div className="flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3">
+                    <span className="grid h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-950 text-white">
+                      {getAvatarUrl(user) ? (
+                        <img src={getAvatarUrl(user)} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="grid h-full w-full place-items-center text-sm font-semibold">
+                          {getUserInitial(user)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-slate-950">{user?.name}</span>
+                      <span className="block truncate text-xs font-medium text-slate-500">{user?.email}</span>
+                    </span>
+                  </div>
+                  <Link
+                    to="/settings"
+                    onClick={() => setOpen(false)}
+                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    <Settings size={17} /> Settings
+                  </Link>
+                  <Link
+                    to="/about"
+                    onClick={() => setOpen(false)}
+                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    <Info size={17} /> About us
+                  </Link>
+                  <Link
+                    to="/contact"
+                    onClick={() => setOpen(false)}
+                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    <Mail size={17} /> Contact us
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      handleLogout()
+                    }}
+                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                  >
+                    <LogOut size={17} /> Logout
+                  </button>
+                </>
               ) : (
                 <Link to="/login" onClick={() => setOpen(false)} className="rounded px-3 py-2 text-sm font-semibold">
                   Login
@@ -373,7 +638,7 @@ function HomePage() {
 
 function EventsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(searchParams.get('search') || '')
   const [city, setCity] = useState('All cities')
   const [remoteEvents, setRemoteEvents] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -408,6 +673,19 @@ function EventsPage() {
       nextParams.set('category', value)
     }
 
+    setSearchParams(nextParams)
+  }
+
+  function handleQueryChange(value) {
+    const nextParams = new URLSearchParams(searchParams)
+
+    if (value.trim()) {
+      nextParams.set('search', value)
+    } else {
+      nextParams.delete('search')
+    }
+
+    setQuery(value)
     setSearchParams(nextParams)
   }
 
@@ -446,7 +724,7 @@ function EventsPage() {
           <FieldIcon icon={Search}>
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => handleQueryChange(event.target.value)}
               placeholder="Search events"
               className="w-full bg-transparent outline-none"
             />
@@ -483,6 +761,122 @@ function EventsPage() {
   )
 }
 
+function SettingsPage() {
+  const { user } = useAuth()
+  const avatarUrl = getAvatarUrl(user)
+
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <SectionTitle kicker="Account" title="Settings" />
+      <div className="mt-6 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+        <section className="rounded border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-4">
+            <span className="grid h-16 w-16 overflow-hidden rounded-full bg-slate-950 text-white">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full w-full place-items-center text-xl font-semibold">
+                  {getUserInitial(user)}
+                </span>
+              )}
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-semibold text-slate-950">{user?.name || 'Ticketo user'}</h2>
+              <p className="mt-1 truncate text-sm font-medium text-slate-500">{user?.email}</p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 text-sm">
+            <SettingsRow label="Role" value={user?.role === 'admin' ? 'Admin' : 'Customer'} />
+            <SettingsRow label="Booking alerts" value="Sent to your account email" />
+            <SettingsRow label="Support channel" value={supportEmail} />
+          </div>
+        </section>
+
+        <section className="rounded border border-slate-200 bg-white p-5">
+          <h2 className="text-xl font-semibold text-slate-950">Preferences</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Profile editing is not enabled yet, but your account details are ready for bookings, QR tickets, and event
+            updates.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <InfoTile icon={Mail} label="Email receipts" value="Enabled" />
+            <InfoTile icon={Ticket} label="Ticket delivery" value="QR code and booking email" />
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}
+
+function AboutPage() {
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <SectionTitle kicker="About" title="About Ticketo" />
+      <section className="mt-6 rounded border border-slate-200 bg-white p-6">
+        <p className="max-w-3xl text-base leading-7 text-slate-600">
+          Ticketo helps people discover events, reserve seats, and receive ticket confirmations in one focused booking
+          flow. Organizers can publish events, monitor inventory, and keep booking operations in one place.
+        </p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <InfoTile icon={CalendarDays} label="Events" value="Browse by category, city, and date" />
+          <InfoTile icon={Ticket} label="Bookings" value="Reserve seats with QR tickets" />
+          <InfoTile icon={Users} label="Organizers" value="Admin tools for event teams" />
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function ContactPage() {
+  const { user } = useAuth()
+
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <SectionTitle kicker="Support" title="Contact us" />
+      <section className="mt-6 rounded border border-slate-200 bg-white p-6">
+        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">Event and booking help</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Email the Ticketo support/admin team for event publishing issues, booking questions, payment references,
+              ticket delivery, or account access.
+            </p>
+            <p className="mt-4 text-sm font-semibold text-slate-700">{supportEmail}</p>
+          </div>
+          <a
+            href={getSupportMailto(user)}
+            className="inline-flex items-center justify-center gap-2 rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            <Mail size={18} />
+            Email support
+          </a>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function SettingsRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded border border-slate-200 bg-slate-50 px-3 py-2">
+      <span className="font-medium text-slate-500">{label}</span>
+      <span className="truncate text-right font-semibold text-slate-950">{value}</span>
+    </div>
+  )
+}
+
+function InfoTile({ icon: Icon, label, value }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50 p-4">
+      <span className="grid h-10 w-10 place-items-center rounded bg-white text-rose-600">
+        <Icon size={19} />
+      </span>
+      <p className="mt-3 text-sm font-semibold text-slate-950">{label}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-500">{value}</p>
+    </div>
+  )
+}
+
 function EventDetailPage() {
   const { eventId } = useParams()
   const navigate = useNavigate()
@@ -490,10 +884,21 @@ function EventDetailPage() {
   const [event, setEvent] = useState(null)
   const [lockedSeats, setLockedSeats] = useState([])
   const [selectedSeats, setSelectedSeats] = useState([])
+  const [seatLockExpiresAt, setSeatLockExpiresAt] = useState({})
+  const [currentTime, setCurrentTime] = useState(() => getCurrentTimestamp())
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isBooking, setIsBooking] = useState(false)
   const seatLabels = event?.seats?.map((seat) => seat.number) || []
+
+  async function refreshSeatStatuses(eventMongoId) {
+    const seatsResponse = await api.get(`/events/${eventMongoId}/seats`)
+    setLockedSeats(
+      seatsResponse.data.seats
+        .filter((seat) => seat.status === 'locked' || seat.status === 'booked' || seat.status === 'blocked')
+        .map((seat) => seat.number),
+    )
+  }
 
   useEffect(() => {
     async function loadEvent() {
@@ -505,16 +910,13 @@ function EventDetailPage() {
         const normalized = normalizeEvent(data.event)
         setEvent(normalized)
 
-        const seatsResponse = await api.get(`/events/${data.event._id}/seats`)
-        setLockedSeats(
-          seatsResponse.data.seats
-            .filter((seat) => seat.status === 'locked' || seat.status === 'booked' || seat.status === 'blocked')
-            .map((seat) => seat.number),
-        )
+        await refreshSeatStatuses(data.event._id)
         setSelectedSeats([])
+        setSeatLockExpiresAt({})
       } catch (error) {
         setEvent(null)
         setSelectedSeats([])
+        setSeatLockExpiresAt({})
         setLockedSeats([])
         setLoadError(getApiErrorMessage(error))
       } finally {
@@ -524,6 +926,37 @@ function EventDetailPage() {
 
     loadEvent()
   }, [eventId])
+
+  useEffect(() => {
+    if (!selectedSeats.length) return undefined
+
+    const timer = window.setInterval(() => {
+      const nextTime = getCurrentTimestamp()
+      const expiredSeats = selectedSeats.filter((seat) => seatLockExpiresAt[seat] <= nextTime)
+
+      setCurrentTime(nextTime)
+
+      if (!expiredSeats.length) {
+        return
+      }
+
+      setSelectedSeats((current) => current.filter((seat) => !expiredSeats.includes(seat)))
+      setSeatLockExpiresAt((current) => {
+        const next = { ...current }
+        expiredSeats.forEach((seat) => {
+          delete next[seat]
+        })
+        return next
+      })
+
+      toast.error('Seat hold expired')
+      if (event?.mongoId) {
+        refreshSeatStatuses(event.mongoId).catch(() => null)
+      }
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [event?.mongoId, seatLockExpiresAt, selectedSeats])
 
   async function toggleSeat(seat) {
     if (!event || lockedSeats.includes(seat)) return
@@ -541,12 +974,24 @@ function EventDetailPage() {
           seatNumber: seat,
         })
         setSelectedSeats((current) => current.filter((item) => item !== seat))
+        setSeatLockExpiresAt((current) => {
+          const next = { ...current }
+          delete next[seat]
+          return next
+        })
       } else {
-        await api.post('/bookings/lock-seat', {
+        const { data } = await api.post('/bookings/lock-seat', {
           eventId: event.mongoId,
           seatNumber: seat,
         })
+        const expiresInSeconds = data.lock?.expiresInSeconds || 600
         setSelectedSeats((current) => [...current, seat])
+        const lockedUntil = getCurrentTimestamp() + expiresInSeconds * 1000
+        setSeatLockExpiresAt((current) => ({
+          ...current,
+          [seat]: lockedUntil,
+        }))
+        setCurrentTime(getCurrentTimestamp())
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error))
@@ -584,6 +1029,12 @@ function EventDetailPage() {
 
   const subtotal = selectedSeats.reduce((total, seatNumber) => total + getSeatPrice(seatNumber), 0)
   const fees = selectedSeats.length ? 99 : 0
+  const nextLockExpiry = Math.min(
+    ...selectedSeats.map((seat) => seatLockExpiresAt[seat]).filter((expiresAt) => Number.isFinite(expiresAt)),
+  )
+  const holdSecondsRemaining = Number.isFinite(nextLockExpiry)
+    ? Math.max(0, Math.ceil((nextLockExpiry - currentTime) / 1000))
+    : 0
 
   if (isLoading) {
     return (
@@ -608,7 +1059,7 @@ function EventDetailPage() {
   }
 
   return (
-    <main>
+    <main className={selectedSeats.length ? 'pb-28 lg:pb-0' : ''}>
       <section className="bg-slate-950 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
           <div className="overflow-hidden rounded border border-white/10">
@@ -632,17 +1083,24 @@ function EventDetailPage() {
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold">Select seats</h2>
-              <p className="text-sm text-slate-500">Selected seats are temporarily held for 10 minutes.</p>
+              <p className="text-sm text-slate-500">
+                {selectedSeats.length
+                  ? `Your hold expires in ${formatDuration(holdSecondsRemaining)}.`
+                  : 'Pick your preferred seats to continue.'}
+              </p>
             </div>
-            <span className="inline-flex w-fit items-center gap-2 rounded bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
-              <Clock3 size={16} /> Temporary hold
-            </span>
+            {selectedSeats.length > 0 && (
+              <span className="inline-flex w-fit items-center gap-2 rounded bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                <Clock3 size={16} /> {formatDuration(holdSecondsRemaining)}
+              </span>
+            )}
           </div>
           <div className="mb-5 rounded bg-slate-100 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
             Stage
           </div>
+          <SeatLegend />
           {seatLabels.length ? (
-            <div className="grid grid-cols-6 gap-2">
+            <div className="mt-4 grid grid-cols-6 gap-2">
               {seatLabels.map((seat) => {
                 const isLocked = lockedSeats.includes(seat)
                 const isSelected = selectedSeats.includes(seat)
@@ -652,6 +1110,7 @@ function EventDetailPage() {
                     type="button"
                     onClick={() => toggleSeat(seat)}
                     disabled={isLocked}
+                    title={isLocked ? 'Unavailable seat' : isSelected ? 'Your selected seat' : 'Available seat'}
                     className={`h-11 rounded text-sm font-semibold transition ${
                       isLocked
                         ? 'cursor-not-allowed bg-slate-200 text-slate-400'
@@ -677,6 +1136,9 @@ function EventDetailPage() {
           <div className="mt-4 space-y-3 text-sm">
             <SummaryRow label="Tickets" value={`${selectedSeats.length} selected`} />
             <SummaryRow label="Seats" value={selectedSeats.join(', ') || 'None'} />
+            {selectedSeats.length > 0 && (
+              <SummaryRow label="Hold" value={`${formatDuration(holdSecondsRemaining)} remaining`} />
+            )}
             <SummaryRow label="Price" value={`INR ${subtotal.toLocaleString('en-IN')}`} />
             <SummaryRow label="Fees" value={`INR ${fees}`} />
           </div>
@@ -697,6 +1159,28 @@ function EventDetailPage() {
           </button>
         </aside>
       </section>
+      {selectedSeats.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white p-4 shadow-2xl lg:hidden">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-950">
+                {selectedSeats.length} {selectedSeats.length === 1 ? 'seat' : 'seats'} selected
+              </p>
+              <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                <Clock3 size={14} /> {formatDuration(holdSecondsRemaining)} remaining
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isBooking}
+              onClick={confirmBooking}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              <CreditCard size={17} /> {formatINR(subtotal + fees)}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -1211,15 +1695,34 @@ function ConnectedAuthPage({ mode }) {
 }
 
 function SearchPanel() {
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+
+  function submitSearch(event) {
+    event.preventDefault()
+
+    const params = new URLSearchParams()
+    if (query.trim()) {
+      params.set('search', query.trim())
+    }
+
+    navigate(params.toString() ? `/events?${params.toString()}` : '/events')
+  }
+
   return (
-    <div className="grid gap-3 rounded border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_auto]">
+    <form onSubmit={submitSearch} className="grid gap-3 rounded border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_auto]">
       <FieldIcon icon={Search}>
-        <input placeholder="Search events" className="w-full bg-transparent outline-none" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search events"
+          className="w-full bg-transparent outline-none"
+        />
       </FieldIcon>
-      <Link to="/events" className="inline-flex items-center justify-center rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
+      <button type="submit" className="inline-flex items-center justify-center rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
         Search
-      </Link>
-    </div>
+      </button>
+    </form>
   )
 }
 
@@ -1407,6 +1910,25 @@ function InfoBox({ label, value }) {
     <div className="rounded border border-white/10 bg-white/10 p-4">
       <p className="text-sm font-medium text-white/65">{label}</p>
       <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+    </div>
+  )
+}
+
+function SeatLegend() {
+  const items = [
+    { label: 'Available', className: 'bg-slate-50 border-slate-300' },
+    { label: 'Selected', className: 'bg-rose-600 border-rose-600' },
+    { label: 'Unavailable', className: 'bg-slate-200 border-slate-300' },
+  ]
+
+  return (
+    <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
+      {items.map((item) => (
+        <span key={item.label} className="inline-flex items-center gap-2">
+          <span className={`h-3 w-3 rounded border ${item.className}`} />
+          {item.label}
+        </span>
+      ))}
     </div>
   )
 }
