@@ -1,10 +1,12 @@
 const mongoose = require('mongoose')
 const Event = require('../models/Event')
 const ApiError = require('../utils/ApiError')
-const { deleteCache } = require('../services/cacheService')
+const { deleteCachePattern, getCache, setCache } = require('../services/cacheService')
 const { deleteAsset, uploadBuffer } = require('../services/cloudinaryService')
 const { getSeatLocks } = require('../services/seatLockService')
 const { ensureEventCanBePublished, ensureEventIsPublic } = require('../utils/eventLifecycle')
+
+const PUBLIC_EVENT_CACHE_TTL_SECONDS = 60
 
 function slugify(value) {
   return value
@@ -46,8 +48,22 @@ function ensureObjectId(id) {
   }
 }
 
+function buildCacheKey(prefix, values) {
+  const params = new URLSearchParams()
+
+  Object.entries(values)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .sort(([left], [right]) => left.localeCompare(right))
+    .forEach(([key, value]) => {
+      params.set(key, String(value).trim().toLowerCase())
+    })
+
+  const suffix = params.toString()
+  return suffix ? `${prefix}:${suffix}` : prefix
+}
+
 async function clearEventCaches() {
-  await deleteCache('events:published').catch(() => null)
+  await deleteCachePattern('events:public:*').catch(() => null)
 }
 
 async function createEvent(req, res, next) {
@@ -106,6 +122,21 @@ async function uploadEventPoster(req, res, next) {
 async function getPublishedEvents(req, res, next) {
   try {
     const { search, city, category, page = 1, limit = 12 } = req.query
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 50)
+    const cacheKey = buildCacheKey('events:public:list', {
+      category,
+      city,
+      limit: pageSize,
+      page: pageNumber,
+      search,
+    })
+    const cachedResponse = await getCache(cacheKey).catch(() => null)
+
+    if (cachedResponse) {
+      return res.status(200).json(cachedResponse)
+    }
+
     const query = { status: 'published', startsAt: { $gte: new Date() } }
 
     if (category) query.category = category
@@ -122,9 +153,6 @@ async function getPublishedEvents(req, res, next) {
       ]
     }
 
-    const pageNumber = Math.max(Number(page), 1)
-    const pageSize = Math.min(Math.max(Number(limit), 1), 50)
-
     const [events, total] = await Promise.all([
       Event.find(query)
         .sort({ startsAt: 1 })
@@ -134,7 +162,7 @@ async function getPublishedEvents(req, res, next) {
       Event.countDocuments(query),
     ])
 
-    res.status(200).json({
+    const responseBody = {
       success: true,
       message: 'Events fetched successfully',
       events,
@@ -144,7 +172,11 @@ async function getPublishedEvents(req, res, next) {
         total,
         pages: Math.ceil(total / pageSize),
       },
-    })
+    }
+
+    await setCache(cacheKey, responseBody, PUBLIC_EVENT_CACHE_TTL_SECONDS).catch(() => null)
+
+    res.status(200).json(responseBody)
   } catch (error) {
     next(error)
   }
@@ -183,6 +215,13 @@ async function getAdminEvents(req, res, next) {
 async function getEvent(req, res, next) {
   try {
     const { eventId } = req.params
+    const cacheKey = buildCacheKey('events:public:detail', { eventId })
+    const cachedResponse = await getCache(cacheKey).catch(() => null)
+
+    if (cachedResponse) {
+      return res.status(200).json(cachedResponse)
+    }
+
     const query = mongoose.Types.ObjectId.isValid(eventId) ? { _id: eventId } : { slug: eventId }
     const event = await Event.findOne(query).populate('createdBy', 'name email')
 
@@ -191,11 +230,19 @@ async function getEvent(req, res, next) {
     }
     ensureEventIsPublic(event)
 
-    res.status(200).json({
+    const secondsUntilStart = Math.floor((new Date(event.startsAt).getTime() - Date.now()) / 1000)
+    const cacheTtlSeconds = Number.isFinite(secondsUntilStart)
+      ? Math.max(1, Math.min(PUBLIC_EVENT_CACHE_TTL_SECONDS, secondsUntilStart))
+      : PUBLIC_EVENT_CACHE_TTL_SECONDS
+    const responseBody = {
       success: true,
       message: 'Event fetched successfully',
       event,
-    })
+    }
+
+    await setCache(cacheKey, responseBody, cacheTtlSeconds).catch(() => null)
+
+    res.status(200).json(responseBody)
   } catch (error) {
     next(error)
   }

@@ -4,6 +4,7 @@ const Event = require('../models/Event')
 const ApiError = require('../utils/ApiError')
 const generateQR = require('../utils/generateQR')
 const { ensureEventIsBookable } = require('../utils/eventLifecycle')
+const { deleteCachePattern } = require('../services/cacheService')
 const { sendEmail } = require('../services/emailService')
 const { getSeatLockOwner, lockSeat, releaseSeatForUser, releaseSeatsForUser } = require('../services/seatLockService')
 const env = require('../config/env')
@@ -212,6 +213,10 @@ async function createBooking(req, res, next) {
     })
 
     if (req.bookedSeatNumbers?.length) {
+      deleteCachePattern('events:public:*').catch((error) => {
+        console.warn('Event cache cleanup failed:', error.message)
+      })
+
       releaseSeatsForUser({
         eventId,
         seatNumbers: req.bookedSeatNumbers,

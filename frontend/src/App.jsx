@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast, { Toaster } from 'react-hot-toast'
 import {
@@ -12,122 +12,30 @@ import {
   Filter,
   Heart,
   ListChecks,
-  LockKeyhole,
   MapPin,
   Menu,
   Plus,
   Search,
-  ShieldCheck,
-  Sparkles,
   Ticket,
   User,
   Users,
   X,
 } from 'lucide-react'
-import { addDays, format } from 'date-fns'
+import { format } from 'date-fns'
 import { useAuth } from './context/useAuth'
 import api from './services/api'
 import { getApiErrorMessage } from './services/api'
 
 const categories = ['All', 'Music', 'Comedy', 'Business', 'Sports', 'Food']
 
-const events = [
-  {
-    id: 'neon-nights',
-    title: 'Neon Nights Music Festival',
-    category: 'Music',
-    city: 'Mumbai',
-    venue: 'Jio World Garden',
-    date: addDays(new Date(), 9),
-    time: '7:00 PM',
-    priceFrom: 1499,
-    sold: 84,
-    rating: '4.8',
-    image:
-      'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80',
-    accent: 'from-fuchsia-600 to-orange-500',
-  },
-  {
-    id: 'founders-summit',
-    title: 'Founders Growth Summit',
-    category: 'Business',
-    city: 'Bengaluru',
-    venue: 'KTPO Convention Centre',
-    date: addDays(new Date(), 14),
-    time: '10:00 AM',
-    priceFrom: 2499,
-    sold: 62,
-    rating: '4.7',
-    image:
-      'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
-    accent: 'from-blue-600 to-cyan-500',
-  },
-  {
-    id: 'laugh-lab',
-    title: 'The Laugh Lab Live',
-    category: 'Comedy',
-    city: 'Delhi',
-    venue: 'Siri Fort Auditorium',
-    date: addDays(new Date(), 5),
-    time: '8:30 PM',
-    priceFrom: 799,
-    sold: 91,
-    rating: '4.9',
-    image:
-      'https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=1200&q=80',
-    accent: 'from-amber-500 to-rose-500',
-  },
-  {
-    id: 'street-food-fiesta',
-    title: 'Street Food Fiesta',
-    category: 'Food',
-    city: 'Pune',
-    venue: 'Amanora Arena',
-    date: addDays(new Date(), 21),
-    time: '4:00 PM',
-    priceFrom: 399,
-    sold: 48,
-    rating: '4.6',
-    image:
-      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80',
-    accent: 'from-emerald-600 to-lime-500',
-  },
-  {
-    id: 'city-cricket-league',
-    title: 'City Cricket League Final',
-    category: 'Sports',
-    city: 'Ahmedabad',
-    venue: 'Sardar Patel Stadium',
-    date: addDays(new Date(), 17),
-    time: '6:00 PM',
-    priceFrom: 1199,
-    sold: 73,
-    rating: '4.7',
-    image:
-      'https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80',
-    accent: 'from-green-700 to-sky-500',
-  },
-  {
-    id: 'design-weekend',
-    title: 'Design Weekend 2026',
-    category: 'Business',
-    city: 'Hyderabad',
-    venue: 'HICC Novotel',
-    date: addDays(new Date(), 28),
-    time: '11:00 AM',
-    priceFrom: 1899,
-    sold: 56,
-    rating: '4.8',
-    image:
-      'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=1200&q=80',
-    accent: 'from-violet-600 to-pink-500',
-  },
-]
+function getCategoryPath(category) {
+  return category === 'All' ? '/events' : `/events?category=${encodeURIComponent(category)}`
+}
 
-const bookings = [
-  { id: 'BK-24081', eventId: 'neon-nights', seats: ['A7', 'A8'], status: 'Confirmed' },
-  { id: 'BK-24064', eventId: 'laugh-lab', seats: ['C3'], status: 'Confirmed' },
-]
+function getCategoryFromSearchParams(searchParams) {
+  const category = searchParams.get('category')
+  return categories.includes(category) ? category : 'All'
+}
 
 const eventFormDefaults = {
   title: '',
@@ -149,13 +57,12 @@ const authFormDefaults = {
   password: '',
 }
 
-function normalizeEvent(event, index = 0) {
+function normalizeEvent(event) {
   if (event.date) {
     return event
   }
 
-  const startsAt = event.startsAt ? new Date(event.startsAt) : addDays(new Date(), index + 1)
-  const fallback = events[index % events.length]
+  const startsAt = event.startsAt ? new Date(event.startsAt) : new Date()
   const totalSeats = event.totalSeats || 1
   const availableSeats = event.availableSeats ?? totalSeats
   const sold = Math.max(0, Math.min(100, Math.round(((totalSeats - availableSeats) / totalSeats) * 100)))
@@ -171,12 +78,13 @@ function normalizeEvent(event, index = 0) {
     address: event.venue?.address,
     date: startsAt,
     time: format(startsAt, 'h:mm a'),
-    priceFrom: event.priceFrom,
+    priceFrom: Number(event.priceFrom || 0),
     sold,
-    rating: 'New',
-    image: event.poster?.url || fallback.image,
-    accent: fallback.accent,
+    image: event.poster?.url || '',
     seats: event.seats || [],
+    totalSeats,
+    availableSeats,
+    status: event.status,
     raw: event,
   }
 }
@@ -361,29 +269,26 @@ function Shell({ children }) {
         )}
       </header>
       {children}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-sm text-slate-500 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
-          <p>Ticketo event booking platform UI prototype.</p>
-          <p>Auth, events, seat locks, and bookings are connected. Payments come later.</p>
-        </div>
-      </footer>
     </>
   )
 }
 
 function HomePage() {
-  const [featuredEvents, setFeaturedEvents] = useState(events)
+  const [featuredEvents, setFeaturedEvents] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const featuredEvent = featuredEvents[0]
 
   useEffect(() => {
     async function loadFeaturedEvents() {
+      setIsLoading(true)
+
       try {
         const { data } = await api.get('/events', { params: { limit: 4 } })
-        if (data.events?.length) {
-          setFeaturedEvents(data.events.map(normalizeEvent))
-        }
+        setFeaturedEvents(data.events ? data.events.map(normalizeEvent) : [])
       } catch {
-        setFeaturedEvents(events)
+        setFeaturedEvents([])
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -396,9 +301,6 @@ function HomePage() {
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div className="flex flex-col justify-center gap-6">
             <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded bg-rose-50 px-3 py-1 text-sm font-medium text-rose-700">
-                <Sparkles size={16} /> Live in 18 Indian cities
-              </p>
               <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-normal text-slate-950 sm:text-5xl lg:text-6xl">
                 Discover events, reserve seats, and book tickets faster.
               </h1>
@@ -411,54 +313,71 @@ function HomePage() {
           </div>
 
           <div className="relative min-h-[420px] overflow-hidden rounded border border-slate-200 bg-slate-950">
-            <img
-              src={featuredEvent.image}
-              alt={featuredEvent.title}
-              className="h-full min-h-[420px] w-full object-cover opacity-80"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-5 text-white sm:p-7">
-              <div className="mb-4 flex flex-wrap gap-2">
-                <span className="rounded bg-white px-3 py-1 text-xs font-semibold text-slate-950">Featured</span>
-                <span className="rounded bg-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-950">
-                  {featuredEvent.sold}% sold
-                </span>
+            {featuredEvent ? (
+              <>
+                <EventPoster event={featuredEvent} className="h-full min-h-[420px] w-full opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-5 text-white sm:p-7">
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    <span className="rounded bg-white px-3 py-1 text-xs font-semibold text-slate-950">Featured</span>
+                    <span className="rounded bg-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-950">
+                      {featuredEvent.sold}% sold
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-semibold sm:text-3xl">{featuredEvent.title}</h2>
+                  <EventMeta event={featuredEvent} light />
+                  <Link
+                    to={`/events/${featuredEvent.id}`}
+                    className="mt-5 inline-flex items-center gap-2 rounded bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100"
+                  >
+                    <Ticket size={18} /> Book now
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="flex min-h-[420px] flex-col justify-end p-6 text-white sm:p-8">
+                <div className="mb-6 grid h-14 w-14 place-items-center rounded bg-white text-slate-950">
+                  <Ticket size={28} />
+                </div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-white/60">
+                  {isLoading ? 'Loading events' : 'No published events'}
+                </p>
+                <h2 className="mt-2 max-w-md text-3xl font-semibold">
+                  {isLoading ? 'Finding available events...' : 'Publish an event to feature it here.'}
+                </h2>
               </div>
-              <h2 className="text-2xl font-semibold sm:text-3xl">{featuredEvent.title}</h2>
-              <EventMeta event={featuredEvent} light />
-              <Link
-                to={`/events/${featuredEvent.id}`}
-                className="mt-5 inline-flex items-center gap-2 rounded bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100"
-              >
-                <Ticket size={18} /> Book now
-              </Link>
-            </div>
+            )}
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <SectionHeader title="Trending events" action="View all" to="/events" />
-        <EventGrid items={featuredEvents.slice(0, 4)} />
-      </section>
-
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-3 lg:px-8">
-          <Metric icon={LockKeyhole} label="Temporary locks" value="Redis-ready seat holds" />
-          <Metric icon={CreditCard} label="Booking flow" value="Checkout UI prepared" />
-          <Metric icon={ShieldCheck} label="Admin controls" value="Role-based views planned" />
-        </div>
+        {isLoading ? (
+          <LoadingPanel label="Loading events..." />
+        ) : featuredEvents.length ? (
+          <EventGrid items={featuredEvents.slice(0, 4)} />
+        ) : (
+          <EmptyState
+            icon={CalendarDays}
+            title="No published events yet"
+            message="Create and publish an event from the admin area to start showing live inventory here."
+            actionLabel="Manage events"
+            actionTo="/admin/events"
+          />
+        )}
       </section>
     </main>
   )
 }
 
 function EventsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('All')
   const [city, setCity] = useState('All cities')
-  const [remoteEvents, setRemoteEvents] = useState(events)
+  const [remoteEvents, setRemoteEvents] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const category = getCategoryFromSearchParams(searchParams)
   const cityOptions = ['All cities', ...new Set(remoteEvents.map((event) => event.city))]
 
   const filteredEvents = useMemo(() => {
@@ -480,6 +399,18 @@ function EventsPage() {
     })
   }, [category, city, query, remoteEvents])
 
+  function handleCategoryChange(value) {
+    const nextParams = new URLSearchParams(searchParams)
+
+    if (value === 'All') {
+      nextParams.delete('category')
+    } else {
+      nextParams.set('category', value)
+    }
+
+    setSearchParams(nextParams)
+  }
+
   useEffect(() => {
     async function loadEvents() {
       setIsLoading(true)
@@ -495,7 +426,7 @@ function EventsPage() {
         setRemoteEvents(data.events ? data.events.map(normalizeEvent) : [])
       } catch (error) {
         toast.error(getApiErrorMessage(error))
-        setRemoteEvents(events)
+        setRemoteEvents([])
       } finally {
         setIsLoading(false)
       }
@@ -520,7 +451,7 @@ function EventsPage() {
               className="w-full bg-transparent outline-none"
             />
           </FieldIcon>
-          <Select value={category} onChange={(event) => setCategory(event.target.value)} options={categories} />
+          <Select value={category} onChange={(event) => handleCategoryChange(event.target.value)} options={categories} />
           <Select
             value={city}
             onChange={(event) => setCity(event.target.value)}
@@ -531,7 +462,23 @@ function EventsPage() {
       <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-500">
         <Filter size={16} /> {isLoading ? 'Loading events...' : `${filteredEvents.length} events available`}
       </div>
-      <EventGrid items={filteredEvents} />
+      {isLoading ? (
+        <LoadingPanel label="Loading events..." />
+      ) : filteredEvents.length ? (
+        <EventGrid items={filteredEvents} />
+      ) : (
+        <EmptyState
+          icon={Search}
+          title="No events found"
+          message="Adjust the filters or publish an event from the admin area."
+          actionLabel="Clear search"
+          onAction={() => {
+            setQuery('')
+            setSearchParams({})
+            setCity('All cities')
+          }}
+        />
+      )}
     </main>
   )
 }
@@ -540,16 +487,19 @@ function EventDetailPage() {
   const { eventId } = useParams()
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
-  const [event, setEvent] = useState(events.find((item) => item.id === eventId) ?? events[0])
-  const [lockedSeats, setLockedSeats] = useState(['A2', 'A3', 'C5', 'D1', 'E6'])
-  const [selectedSeats, setSelectedSeats] = useState(['B4'])
+  const [event, setEvent] = useState(null)
+  const [lockedSeats, setLockedSeats] = useState([])
+  const [selectedSeats, setSelectedSeats] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [isBooking, setIsBooking] = useState(false)
-  const seatLabels = event.seats?.length
-    ? event.seats.map((seat) => seat.number)
-    : Array.from({ length: 30 }, (_, index) => `${String.fromCharCode(65 + Math.floor(index / 6))}${(index % 6) + 1}`)
+  const seatLabels = event?.seats?.map((seat) => seat.number) || []
 
   useEffect(() => {
     async function loadEvent() {
+      setIsLoading(true)
+      setLoadError('')
+
       try {
         const { data } = await api.get(`/events/${eventId}`)
         const normalized = normalizeEvent(data.event)
@@ -562,9 +512,13 @@ function EventDetailPage() {
             .map((seat) => seat.number),
         )
         setSelectedSeats([])
-      } catch {
-        const fallback = events.find((item) => item.id === eventId) ?? events[0]
-        setEvent(fallback)
+      } catch (error) {
+        setEvent(null)
+        setSelectedSeats([])
+        setLockedSeats([])
+        setLoadError(getApiErrorMessage(error))
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -572,14 +526,7 @@ function EventDetailPage() {
   }, [eventId])
 
   async function toggleSeat(seat) {
-    if (lockedSeats.includes(seat)) return
-
-    if (!event.mongoId) {
-      setSelectedSeats((current) =>
-        current.includes(seat) ? current.filter((item) => item !== seat) : [...current, seat],
-      )
-      return
-    }
+    if (!event || lockedSeats.includes(seat)) return
 
     if (!isAuthenticated) {
       toast.error('Login to reserve seats')
@@ -607,11 +554,7 @@ function EventDetailPage() {
   }
 
   async function confirmBooking() {
-    if (!event.mongoId) {
-      toast.success('Dummy booking confirmed')
-      navigate('/bookings')
-      return
-    }
+    if (!event) return
 
     if (!isAuthenticated) {
       toast.error('Login to confirm your booking')
@@ -636,18 +579,40 @@ function EventDetailPage() {
   }
 
   function getSeatPrice(seatNumber) {
-    return event.seats?.find((seat) => seat.number === seatNumber)?.price || event.priceFrom
+    return event?.seats?.find((seat) => seat.number === seatNumber)?.price || event?.priceFrom || 0
   }
 
   const subtotal = selectedSeats.reduce((total, seatNumber) => total + getSeatPrice(seatNumber), 0)
   const fees = selectedSeats.length ? 99 : 0
+
+  if (isLoading) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <LoadingPanel label="Loading event..." />
+      </main>
+    )
+  }
+
+  if (!event) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <EmptyState
+          icon={CalendarDays}
+          title="Event unavailable"
+          message={loadError || 'This event is not published or no longer exists.'}
+          actionLabel="Browse events"
+          actionTo="/events"
+        />
+      </main>
+    )
+  }
 
   return (
     <main>
       <section className="bg-slate-950 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
           <div className="overflow-hidden rounded border border-white/10">
-            <img src={event.image} alt={event.title} className="h-[420px] w-full object-cover" />
+            <EventPoster event={event} className="h-[420px] w-full" />
           </div>
           <div className="flex flex-col justify-center">
             <span className="mb-4 w-fit rounded bg-white px-3 py-1 text-sm font-semibold text-slate-950">{event.category}</span>
@@ -656,7 +621,7 @@ function EventDetailPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <InfoBox label="Starts from" value={`INR ${event.priceFrom.toLocaleString('en-IN')}`} />
               <InfoBox label="Demand" value={`${event.sold}% sold`} />
-              <InfoBox label="Rating" value={event.rating} />
+              <InfoBox label="Available" value={`${event.availableSeats} seats`} />
             </div>
           </div>
         </div>
@@ -670,35 +635,41 @@ function EventDetailPage() {
               <p className="text-sm text-slate-500">Selected seats are temporarily held for 10 minutes.</p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
-              <Clock3 size={16} /> 09:42
+              <Clock3 size={16} /> Temporary hold
             </span>
           </div>
           <div className="mb-5 rounded bg-slate-100 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
             Stage
           </div>
-          <div className="grid grid-cols-6 gap-2">
-            {seatLabels.map((seat) => {
-              const isLocked = lockedSeats.includes(seat)
-              const isSelected = selectedSeats.includes(seat)
-              return (
-                <button
-                  key={seat}
-                  type="button"
-                  onClick={() => toggleSeat(seat)}
-                  disabled={isLocked}
-                  className={`h-11 rounded text-sm font-semibold transition ${
-                    isLocked
-                      ? 'cursor-not-allowed bg-slate-200 text-slate-400'
-                      : isSelected
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {seat}
-                </button>
-              )
-            })}
-          </div>
+          {seatLabels.length ? (
+            <div className="grid grid-cols-6 gap-2">
+              {seatLabels.map((seat) => {
+                const isLocked = lockedSeats.includes(seat)
+                const isSelected = selectedSeats.includes(seat)
+                return (
+                  <button
+                    key={seat}
+                    type="button"
+                    onClick={() => toggleSeat(seat)}
+                    disabled={isLocked}
+                    className={`h-11 rounded text-sm font-semibold transition ${
+                      isLocked
+                        ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+                        : isSelected
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {seat}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="rounded border border-dashed border-slate-300 p-6 text-center text-sm font-semibold text-slate-500">
+              No seats are configured for this event.
+            </div>
+          )}
         </div>
 
         <aside className="h-fit rounded border border-slate-200 bg-white p-5">
@@ -752,37 +723,35 @@ function BookingsPage() {
     loadBookings()
   }, [])
 
-  const fallbackBookings = bookings.map((booking) => ({
-    id: booking.id,
-    bookingCode: booking.id,
-    status: booking.status,
-    seats: booking.seats.map((seat) => ({ number: seat })),
-    event: events.find((item) => item.id === booking.eventId),
-  }))
-  const rows = userBookings.length ? userBookings : fallbackBookings
-
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <SectionTitle kicker="Account" title="My bookings" />
       <div className="mt-6 grid gap-4">
         {isLoading && (
-          <div className="rounded border border-slate-200 bg-white p-6 text-center font-semibold text-slate-500">
-            Loading bookings...
-          </div>
+          <LoadingPanel label="Loading bookings..." />
         )}
-        {!isLoading && rows.map((booking) => {
-          const event = booking.event?.date ? booking.event : normalizeEvent(booking.event || events[0])
+        {!isLoading && userBookings.length === 0 && (
+          <EmptyState
+            icon={Ticket}
+            title="No bookings yet"
+            message="Confirmed bookings will appear here after you reserve seats for a published event."
+            actionLabel="Browse events"
+            actionTo="/events"
+          />
+        )}
+        {!isLoading && userBookings.map((booking) => {
+          const event = booking.event ? normalizeEvent(booking.event) : null
           const seatNumbers = booking.seats.map((seat) => seat.number)
           return (
             <article key={booking._id || booking.id} className="grid gap-4 rounded border border-slate-200 bg-white p-4 md:grid-cols-[160px_1fr_auto]">
-              <img src={event.image} alt={event.title} className="h-36 w-full rounded object-cover md:h-full" />
+              <EventPoster event={event} className="h-36 w-full rounded md:h-full" />
               <div>
                 <div className="flex flex-wrap gap-2">
                   <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{booking.status}</span>
                   <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{booking.bookingCode}</span>
                 </div>
-                <h2 className="mt-3 text-xl font-semibold">{event.title}</h2>
-                <EventMeta event={event} />
+                <h2 className="mt-3 text-xl font-semibold">{event?.title || 'Event unavailable'}</h2>
+                {event ? <EventMeta event={event} /> : <p className="mt-3 text-sm font-semibold text-slate-500">Event details are no longer available.</p>}
                 <p className="mt-3 text-sm font-semibold text-slate-600">Seats: {seatNumbers.join(', ')}</p>
                 {booking.amount && (
                   <p className="mt-1 text-sm font-semibold text-slate-600">
@@ -793,10 +762,8 @@ function BookingsPage() {
               {booking.qrCode?.dataUrl ? (
                 <img src={booking.qrCode.dataUrl} alt={`${booking.bookingCode} QR code`} className="h-28 w-28 self-center rounded ring-1 ring-slate-200" />
               ) : (
-                <div className="grid h-28 w-28 grid-cols-5 gap-1 self-center rounded bg-white p-2 shadow-inner ring-1 ring-slate-200">
-                  {Array.from({ length: 25 }, (_, index) => (
-                    <span key={index} className={`rounded-sm ${index % 3 === 0 || index % 7 === 0 ? 'bg-slate-950' : 'bg-slate-200'}`} />
-                  ))}
+                <div className="grid h-28 w-28 place-items-center self-center rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-center text-xs font-semibold text-slate-500">
+                  QR unavailable
                 </div>
               )}
             </article>
@@ -862,7 +829,7 @@ function AdminDashboardPage() {
         <Stat label="Fill rate" value={stats ? `${stats.fillRate}%` : '-'} icon={CheckCircle2} />
       </div>
       {isLoading && <p className="mt-4 text-sm font-semibold text-slate-500">Loading dashboard analytics...</p>}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="mt-6">
         <div className="rounded border border-slate-200 bg-white p-5">
           <h2 className="text-xl font-semibold">Event performance</h2>
           <div className="mt-5 space-y-4">
@@ -881,15 +848,6 @@ function AdminDashboardPage() {
                 <p className="text-sm font-semibold text-slate-700">{formatINR(event.revenue)}</p>
               </div>
             ))}
-          </div>
-        </div>
-        <div className="rounded border border-slate-200 bg-white p-5">
-          <h2 className="text-xl font-semibold">Operational status</h2>
-          <div className="mt-5 space-y-3">
-            <StatusLine label="Auth endpoints" status="Connected" />
-            <StatusLine label="Seat locking" status="Redis" />
-            <StatusLine label="QR tickets" status="Connected" />
-            <StatusLine label="Poster uploads" status="Cloudinary" />
           </div>
         </div>
       </div>
@@ -994,7 +952,7 @@ function ManageEventsPage() {
     id: event._id,
     title: event.title,
     category: event.category,
-    image: event.poster?.url || events[0].image,
+    image: event.poster?.url || '',
     date: new Date(event.startsAt),
     city: event.venue?.city,
     status: event.status,
@@ -1119,7 +1077,7 @@ function ManageEventsPage() {
                 <tr key={event.id}>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <img src={event.image} alt={event.title} className="h-12 w-16 rounded object-cover" />
+                      <EventPoster event={event} className="h-12 w-16 rounded" />
                       <div>
                         <p className="font-semibold">{event.title}</p>
                         <p className="text-xs text-slate-500">{event.category}</p>
@@ -1171,53 +1129,6 @@ function ManageEventsPage() {
   )
 }
 
-// eslint-disable-next-line no-unused-vars
-function AuthPage({ mode }) {
-  const navigate = useNavigate()
-  const isRegister = mode === 'register'
-
-  function submitAuth(event) {
-    event.preventDefault()
-    toast.success(isRegister ? 'Dummy account created' : 'Dummy login successful')
-    navigate('/events')
-  }
-
-  return (
-    <main className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-7xl place-items-center px-4 py-8 sm:px-6 lg:px-8">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded border border-slate-200 bg-white md:grid-cols-[1fr_0.9fr]">
-        <div className="hidden bg-slate-950 md:block">
-          <img src={events[1].image} alt="Event audience" className="h-full w-full object-cover opacity-80" />
-        </div>
-        <form onSubmit={submitAuth} className="p-6 sm:p-8">
-          <div className="mb-6">
-            <span className="grid h-11 w-11 place-items-center rounded bg-rose-600 text-white">
-              <User size={22} />
-            </span>
-            <h1 className="mt-4 text-3xl font-semibold">{isRegister ? 'Create account' : 'Welcome back'}</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              {isRegister ? 'Start booking and managing tickets.' : 'Continue to your bookings and events.'}
-            </p>
-          </div>
-          <div className="space-y-4">
-            {isRegister && <AuthInput label="Full name" placeholder="Aarav Sharma" />}
-            <AuthInput label="Email" placeholder="you@example.com" type="email" />
-            <AuthInput label="Password" placeholder="********" type="password" />
-          </div>
-          <button type="submit" className="mt-6 w-full rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
-            {isRegister ? 'Register' : 'Login'}
-          </button>
-          <p className="mt-5 text-center text-sm text-slate-500">
-            {isRegister ? 'Already registered?' : 'New to Ticketo?'}{' '}
-            <Link className="font-semibold text-rose-600" to={isRegister ? '/login' : '/register'}>
-              {isRegister ? 'Login' : 'Create account'}
-            </Link>
-          </p>
-        </form>
-      </div>
-    </main>
-  )
-}
-
 function ConnectedAuthPage({ mode }) {
   const navigate = useNavigate()
   const { login, register } = useAuth()
@@ -1250,9 +1161,7 @@ function ConnectedAuthPage({ mode }) {
   return (
     <main className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-7xl place-items-center px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid w-full max-w-5xl overflow-hidden rounded border border-slate-200 bg-white md:grid-cols-[1fr_0.9fr]">
-        <div className="hidden bg-slate-950 md:block">
-          <img src={events[1].image} alt="Event audience" className="h-full w-full object-cover opacity-80" />
-        </div>
+        <AuthVisual />
         <form onSubmit={handleAuthSubmit(submitAuth)} className="p-6 sm:p-8">
           <div className="mb-6">
             <span className="grid h-11 w-11 place-items-center rounded bg-rose-600 text-white">
@@ -1267,19 +1176,16 @@ function ConnectedAuthPage({ mode }) {
             {isRegister && (
               <AuthInput
                 label="Full name"
-                placeholder="Aarav Sharma"
                 registration={registerAuthField('name', { required: isRegister })}
               />
             )}
             <AuthInput
               label="Email"
-              placeholder="you@example.com"
               type="email"
               registration={registerAuthField('email', { required: true })}
             />
             <AuthInput
               label="Password"
-              placeholder="********"
               type="password"
               registration={registerAuthField('password', { required: true, minLength: isRegister ? 8 : 1 })}
               minLength={isRegister ? 8 : 1}
@@ -1306,24 +1212,9 @@ function ConnectedAuthPage({ mode }) {
 
 function SearchPanel() {
   return (
-    <div className="grid gap-3 rounded border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_180px_140px_auto]">
+    <div className="grid gap-3 rounded border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_auto]">
       <FieldIcon icon={Search}>
-        <input placeholder="Search concerts, comedy, sports" className="w-full bg-transparent outline-none" />
-      </FieldIcon>
-      <FieldIcon icon={MapPin}>
-        <select className="w-full bg-transparent outline-none">
-          <option>Mumbai</option>
-          <option>Bengaluru</option>
-          <option>Delhi</option>
-          <option>Pune</option>
-        </select>
-      </FieldIcon>
-      <FieldIcon icon={CalendarDays}>
-        <select className="w-full bg-transparent outline-none">
-          <option>This week</option>
-          <option>This month</option>
-          <option>Weekend</option>
-        </select>
+        <input placeholder="Search events" className="w-full bg-transparent outline-none" />
       </FieldIcon>
       <Link to="/events" className="inline-flex items-center justify-center rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
         Search
@@ -1338,9 +1229,11 @@ function CategoryStrip() {
       {categories.map((category, index) => (
         <Link
           key={category}
-          to="/events"
-          className={`shrink-0 rounded border px-4 py-2 text-sm font-semibold ${
-            index === 0 ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-700'
+          to={getCategoryPath(category)}
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+            index === 0
+              ? 'border-slate-950 bg-slate-950 text-white'
+              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950'
           }`}
         >
           {category}
@@ -1365,7 +1258,7 @@ function EventCard({ event }) {
     <article className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <Link to={`/events/${event.id}`} className="block">
         <div className="relative h-48">
-          <img src={event.image} alt={event.title} className="h-full w-full object-cover" />
+          <EventPoster event={event} className="h-full w-full" />
           <button
             type="button"
             onClick={(clickEvent) => {
@@ -1394,6 +1287,27 @@ function EventCard({ event }) {
   )
 }
 
+function EventPoster({ event, className = '' }) {
+  const title = event?.title || 'Event'
+  const category = event?.category || 'Event'
+
+  if (event?.image) {
+    return <img src={event.image} alt={title} className={`${className} object-cover`} />
+  }
+
+  return (
+    <div className={`${className} grid place-items-center bg-slate-900 p-4 text-center text-white`}>
+      <div>
+        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded bg-white text-slate-950">
+          <Ticket size={22} />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">{category}</p>
+        <p className="mt-1 line-clamp-2 text-sm font-semibold">{title}</p>
+      </div>
+    </div>
+  )
+}
+
 function EventMeta({ event, light = false }) {
   const tone = light ? 'text-white/85' : 'text-slate-500'
   return (
@@ -1404,6 +1318,52 @@ function EventMeta({ event, light = false }) {
       <span className="inline-flex items-center gap-2">
         <MapPin size={16} /> {event.venue}, {event.city}
       </span>
+    </div>
+  )
+}
+
+function EmptyState({ icon: Icon, title, message, actionLabel, actionTo, onAction }) {
+  const actionClass = 'mt-5 inline-flex items-center justify-center rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+
+  return (
+    <div className="rounded border border-dashed border-slate-300 bg-white p-8 text-center">
+      <span className="mx-auto grid h-12 w-12 place-items-center rounded bg-slate-100 text-slate-700">
+        <Icon size={22} />
+      </span>
+      <h2 className="mt-4 text-xl font-semibold text-slate-950">{title}</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{message}</p>
+      {actionTo && (
+        <Link to={actionTo} className={actionClass}>
+          {actionLabel}
+        </Link>
+      )}
+      {onAction && (
+        <button type="button" onClick={onAction} className={actionClass}>
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function LoadingPanel({ label }) {
+  return (
+    <div className="rounded border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+      {label}
+    </div>
+  )
+}
+
+function AuthVisual() {
+  return (
+    <div className="hidden bg-slate-950 p-8 text-white md:flex md:flex-col md:justify-between">
+      <div className="grid h-12 w-12 place-items-center rounded bg-white text-slate-950">
+        <Ticket size={24} />
+      </div>
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-white/55">Ticketo</p>
+        <h2 className="mt-3 text-3xl font-semibold leading-tight">Manage access to bookings, events, and tickets.</h2>
+      </div>
     </div>
   )
 }
@@ -1424,20 +1384,6 @@ function SectionTitle({ kicker, title }) {
     <div>
       <p className="text-sm font-semibold uppercase tracking-wide text-rose-600">{kicker}</p>
       <h1 className="mt-1 text-3xl font-semibold tracking-normal">{title}</h1>
-    </div>
-  )
-}
-
-function Metric({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-4">
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded bg-slate-100 text-slate-900">
-        <Icon size={22} />
-      </span>
-      <div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <p className="font-semibold text-slate-950">{value}</p>
-      </div>
     </div>
   )
 }
@@ -1470,15 +1416,6 @@ function SummaryRow({ label, value, strong = false }) {
     <div className={`flex items-center justify-between gap-4 ${strong ? 'text-lg font-semibold' : 'text-slate-600'}`}>
       <span>{label}</span>
       <span className={strong ? '' : 'font-semibold text-slate-950'}>{value}</span>
-    </div>
-  )
-}
-
-function StatusLine({ label, status }) {
-  return (
-    <div className="flex items-center justify-between rounded bg-slate-50 px-3 py-3">
-      <span className="font-medium text-slate-700">{label}</span>
-      <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">{status}</span>
     </div>
   )
 }
