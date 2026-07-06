@@ -12,7 +12,7 @@ There is no root `package.json`. Run frontend and backend commands from their ow
 
 ## Frontend
 
-Current status: initial UI prototype with auth, public event browsing, event detail, admin event management, Cloudinary poster uploads, Redis seat locking, booking confirmation, QR tickets, confirmation emails, and My Bookings connected to the backend.
+Current status: connected UI with auth, profile settings, avatar upload, public event browsing, event detail, admin event management, Cloudinary poster uploads, Redis seat locking, booking confirmation, QR tickets, booking cancellation, support contact, confirmation emails, and My Bookings connected to the backend.
 
 ```bash
 cd frontend
@@ -27,10 +27,12 @@ Included UI screens:
 - Event details with dummy seat selection
 - Event details with Redis-backed temporary seat locking for database events
 - Login/register UI
-- My bookings with QR ticket display
-- Admin dashboard
-- Manage events
-- Cloudinary-backed event poster upload
+- Profile menu, editable settings, password change, and avatar upload
+- My bookings with QR ticket display, QR download, print, and cancellation
+- Contact support form
+- Admin dashboard with support queue
+- Manage events with create, edit, publish, cancel, and safer delete confirmation
+- Cloudinary-backed event poster and avatar uploads
 
 Frontend environment:
 
@@ -59,6 +61,9 @@ Auth endpoints:
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `PATCH /api/auth/me`
+- `PATCH /api/auth/avatar`
+- `PATCH /api/auth/password`
 
 Event endpoints:
 
@@ -82,10 +87,20 @@ Booking endpoints:
 
 - `POST /api/bookings`
 - `GET /api/bookings/my`
+- `PATCH /api/bookings/:bookingId/cancel`
+
+Contact endpoints:
+
+- `POST /api/contact`
 
 Admin endpoints:
 
 - `GET /api/admin/dashboard`
+- `GET /api/admin/users`
+- `PATCH /api/admin/users/:userId/role`
+- `PATCH /api/admin/users/:userId/status`
+- `GET /api/admin/contact-messages`
+- `PATCH /api/admin/contact-messages/:messageId/status`
 
 ## Postman
 
@@ -114,9 +129,19 @@ Required local services for the backend server:
 - MongoDB at `MONGO_URI`
 - Redis at `REDIS_URL`
 
-Cloudinary variables are required for poster uploads. SMTP variables are optional in development; confirmation emails are skipped if SMTP is not configured.
+Cloudinary variables are required for poster and avatar uploads. SMTP variables are optional in development; confirmation and support emails are skipped if SMTP is not configured, but support messages are still stored in MongoDB.
+
+Useful production checks:
+
+- Set a strong `JWT_SECRET`; the default is rejected in production.
+- Set `CLIENT_URL` to the deployed frontend URL so CORS and cookies work.
+- Set `QR_CODE_BASE_URL` to the deployed ticket URL base.
+- Set `SUPPORT_EMAIL` to the admin/support inbox.
+- Configure Cloudinary before enabling poster or avatar uploads.
+- Configure SMTP if booking confirmations and support notifications should be emailed.
+- Use HTTPS in production so secure cookies work correctly.
 
 Planned backend features:
 
 - Payment integration
-- Broader integration tests for auth, events, locks, and bookings
+- Broader integration tests for cancellation, support messages, and upload edge cases

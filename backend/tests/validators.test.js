@@ -1,7 +1,13 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
-const { loginSchema, registerSchema } = require('../src/validators/authValidator')
+const {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+} = require('../src/validators/authValidator')
 const { createBookingSchema, seatLockSchema } = require('../src/validators/bookingValidator')
+const { createContactMessageSchema, updateContactMessageStatusSchema } = require('../src/validators/contactValidator')
 const { createEventSchema } = require('../src/validators/eventValidator')
 
 test('register schema accepts valid user payload', () => {
@@ -19,6 +25,46 @@ test('login schema rejects invalid email', () => {
   const result = loginSchema.safeParse({
     email: 'not-an-email',
     password: 'password123',
+  })
+
+  assert.equal(result.success, false)
+})
+
+test('profile update schema normalizes email', () => {
+  const result = updateProfileSchema.safeParse({
+    name: 'Regular User',
+    email: 'USER@Example.COM',
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.email, 'user@example.com')
+})
+
+test('password change schema requires strong new password', () => {
+  const result = changePasswordSchema.safeParse({
+    currentPassword: 'old-password',
+    newPassword: 'short',
+  })
+
+  assert.equal(result.success, false)
+})
+
+test('contact schema accepts a support message', () => {
+  const result = createContactMessageSchema.safeParse({
+    name: 'Regular User',
+    email: 'USER@Example.COM',
+    category: 'booking',
+    subject: 'Ticket delivery',
+    message: 'I need help finding my booking confirmation.',
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.email, 'user@example.com')
+})
+
+test('contact status schema rejects unknown status', () => {
+  const result = updateContactMessageStatusSchema.safeParse({
+    status: 'archived',
   })
 
   assert.equal(result.success, false)

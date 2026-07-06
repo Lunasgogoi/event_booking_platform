@@ -98,6 +98,58 @@
           }
         },
         {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/auth/avatar"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"password1234\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/password"
+          }
+        },
+        {
           "name": "Logout",
           "request": {
             "method": "POST",
@@ -140,6 +192,40 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/events/{{eventId}}/seats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contact",
+      "item": [
+        {
+          "name": "Create Contact Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.contactMessage?._id) pm.environment.set('contactMessageId', json.contactMessage._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"user@example.com\",\n  \"category\": \"booking\",\n  \"subject\": \"Ticket delivery question\",\n  \"message\": \"I need help finding my booking confirmation email.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/contact"
           }
         }
       ]
@@ -285,6 +371,18 @@
         },
         {
           "name": "Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.booking?._id) pm.environment.set('bookingId', json.booking._id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -307,6 +405,14 @@
             "header": [],
             "url": "{{baseUrl}}/api/bookings/my"
           }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/cancel"
+          }
         }
       ]
     },
@@ -319,6 +425,43 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/dashboard"
+          }
+        },
+        {
+          "name": "List Contact Messages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.contactMessages?.[0]?._id) pm.environment.set('contactMessageId', json.contactMessages[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/contact-messages?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Update Contact Message Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/contact-messages/{{contactMessageId}}/status"
           }
         },
         {

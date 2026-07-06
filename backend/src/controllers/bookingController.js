@@ -295,7 +295,69 @@ async function getMyBookings(req, res, next) {
   }
 }
 
+async function cancelBooking(req, res, next) {
+  try {
+    const { bookingId } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      throw new ApiError(400, 'Invalid booking id')
+    }
+
+    const booking = await Booking.findOne({ _id: bookingId, user: req.user._id }).populate('event')
+    if (!booking) {
+      throw new ApiError(404, 'Booking not found')
+    }
+
+    if (booking.status !== 'confirmed') {
+      throw new ApiError(400, 'Only confirmed bookings can be cancelled')
+    }
+
+    if (booking.event?.startsAt && booking.event.startsAt <= new Date()) {
+      throw new ApiError(400, 'Past or started event bookings cannot be cancelled')
+    }
+
+    const seatNumbers = booking.seats.map((seat) => seat.number)
+
+    if (booking.event?._id && seatNumbers.length) {
+      await Event.updateOne(
+        { _id: booking.event._id },
+        {
+          $set: {
+            'seats.$[seat].status': 'available',
+          },
+          $inc: {
+            availableSeats: seatNumbers.length,
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              'seat.number': { $in: seatNumbers },
+              'seat.status': 'booked',
+            },
+          ],
+        },
+      )
+      await deleteCachePattern('events:public:*').catch(() => null)
+    }
+
+    booking.status = 'cancelled'
+    booking.paymentStatus = booking.paymentStatus === 'paid' ? 'refunded' : booking.paymentStatus
+    booking.cancelledAt = new Date()
+    await booking.save()
+
+    res.status(200).json({
+      success: true,
+      message: 'Booking cancelled successfully',
+      booking,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 module.exports = {
+  cancelBooking,
   createBooking,
   getMyBookings,
   lockSeatForBooking,

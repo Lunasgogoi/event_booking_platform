@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const Booking = require('../models/Booking')
+const ContactMessage = require('../models/ContactMessage')
 const Event = require('../models/Event')
 const User = require('../models/User')
 const ApiError = require('../utils/ApiError')
@@ -24,6 +25,7 @@ async function getDashboardStats(req, res, next) {
       fillRateResult,
       eventPerformance,
       recentBookings,
+      newSupportMessages,
     ] = await Promise.all([
       Booking.aggregate([
         { $match: { status: 'confirmed' } },
@@ -80,6 +82,7 @@ async function getDashboardStats(req, res, next) {
         .limit(5)
         .populate('user', 'name email')
         .populate('event', 'title'),
+      ContactMessage.countDocuments({ status: 'new' }),
     ])
 
     const counts = eventCounts.reduce(
@@ -108,6 +111,9 @@ async function getDashboardStats(req, res, next) {
           cancelled: counts.cancelled || 0,
           completed: counts.completed || 0,
         },
+        supportMessages: {
+          new: newSupportMessages,
+        },
       },
       eventPerformance: eventPerformance.map((item) => ({
         id: item._id,
@@ -128,6 +134,69 @@ async function getDashboardStats(req, res, next) {
         status: booking.status,
         createdAt: booking.createdAt,
       })),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function getContactMessages(req, res, next) {
+  try {
+    const { status, page = 1, limit = 20 } = req.query
+    const query = {}
+
+    if (status) query.status = status
+
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+
+    const [messages, total] = await Promise.all([
+      ContactMessage.find(query)
+        .sort({ createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize),
+      ContactMessage.countDocuments(query),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Contact messages fetched successfully',
+      contactMessages: messages,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize),
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function updateContactMessageStatus(req, res, next) {
+  try {
+    const { messageId } = req.params
+    const { status } = req.body
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      throw new ApiError(400, 'Invalid contact message id')
+    }
+
+    const contactMessage = await ContactMessage.findByIdAndUpdate(
+      messageId,
+      { status },
+      { returnDocument: 'after', runValidators: true },
+    )
+
+    if (!contactMessage) {
+      throw new ApiError(404, 'Contact message not found')
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Contact message updated successfully',
+      contactMessage,
     })
   } catch (error) {
     next(error)
@@ -227,8 +296,10 @@ async function updateUserStatus(req, res, next) {
 }
 
 module.exports = {
+  getContactMessages,
   getDashboardStats,
   getUsers,
+  updateContactMessageStatus,
   updateUserRole,
   updateUserStatus,
 }

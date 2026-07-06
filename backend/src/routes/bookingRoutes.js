@@ -1,5 +1,5 @@
 const express = require('express')
-const { createBooking, getMyBookings, lockSeatForBooking, releaseSeatLock } = require('../controllers/bookingController')
+const { cancelBooking, createBooking, getMyBookings, lockSeatForBooking, releaseSeatLock } = require('../controllers/bookingController')
 const { protect } = require('../middlewares/authMiddleware')
 const { bookingLimiter } = require('../middlewares/rateLimiter')
 const validateRequest = require('../middlewares/validateRequest')
@@ -11,5 +11,6 @@ router.post('/lock-seat', protect, bookingLimiter, validateRequest(seatLockSchem
 router.post('/release-seat', protect, validateRequest(seatLockSchema), releaseSeatLock)
 router.post('/', protect, bookingLimiter, validateRequest(createBookingSchema), createBooking)
 router.get('/my', protect, getMyBookings)
+router.patch('/:bookingId/cancel', protect, cancelBooking)
 
 module.exports = router

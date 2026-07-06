@@ -38,14 +38,34 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  async function updateProfile(payload) {
+    const { data } = await api.patch('/auth/me', payload)
+    setUser(data.user)
+    return data.user
+  }
+
+  async function changePassword(payload) {
+    const { data } = await api.patch('/auth/password', payload)
+    return data
+  }
+
+  async function uploadAvatar(formData) {
+    const { data } = await api.patch('/auth/avatar', formData)
+    setUser(data.user)
+    return data.user
+  }
+
   const value = useMemo(
     () => ({
+      changePassword,
       user,
       isAuthenticated: Boolean(user),
       isBootstrapping,
       login,
       register,
       logout,
+      uploadAvatar,
+      updateProfile,
     }),
     [isBootstrapping, user],
   )

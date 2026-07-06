@@ -289,6 +289,7 @@ async function updateEvent(req, res, next) {
     if (!event) {
       throw new ApiError(404, 'Event not found')
     }
+    const previousPosterPublicId = event.poster?.publicId
 
     if (req.body.status && req.body.status !== event.status) {
       throw new ApiError(400, 'Use the dedicated publish or cancel endpoint to change event status')
@@ -313,6 +314,9 @@ async function updateEvent(req, res, next) {
     }
 
     await event.save()
+    if (req.body.poster?.publicId && previousPosterPublicId !== req.body.poster.publicId) {
+      await deleteAsset(previousPosterPublicId)
+    }
     await clearEventCaches()
 
     res.status(200).json({

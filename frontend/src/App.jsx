@@ -9,6 +9,8 @@ import {
   ChevronDown,
   Clock3,
   CreditCard,
+  Ban,
+  Download,
   Edit3,
   Filter,
   Heart,
@@ -20,6 +22,7 @@ import {
   Menu,
   Moon,
   Plus,
+  Printer,
   Search,
   Settings,
   Sun,
@@ -34,6 +37,14 @@ import api from './services/api'
 import { getApiErrorMessage } from './services/api'
 
 const categories = ['All', 'Music', 'Comedy', 'Business', 'Sports', 'Food']
+const contactCategories = [
+  { value: 'booking', label: 'Booking issue' },
+  { value: 'event', label: 'Event information' },
+  { value: 'account', label: 'Account access' },
+  { value: 'payment', label: 'Payment question' },
+  { value: 'organizer', label: 'Organizer support' },
+  { value: 'other', label: 'Other' },
+]
 const supportEmail = 'support@ticketo.events'
 
 function getCategoryPath(category) {
@@ -108,6 +119,23 @@ function formatDuration(totalSeconds) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
+function formatDateTimeInput(value) {
+  if (!value) {
+    return ''
+  }
+
+  return format(new Date(value), "yyyy-MM-dd'T'HH:mm")
+}
+
+function escapeMarkup(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function getUserInitial(user) {
   const source = user?.name || user?.email || 'User'
   return source.trim().charAt(0).toUpperCase()
@@ -115,22 +143,6 @@ function getUserInitial(user) {
 
 function getAvatarUrl(user) {
   return user?.avatar?.url || user?.avatarUrl || ''
-}
-
-function getSupportMailto(user, context = 'Ticketo event support request') {
-  const bodyLines = [
-    'Hi Ticketo team,',
-    '',
-    'I need help with:',
-    '',
-    'Event or booking reference:',
-    '',
-    user?.email ? `Account email: ${user.email}` : '',
-    '',
-    'Thanks,',
-  ].filter((line) => line !== '')
-
-  return `mailto:${supportEmail}?subject=${encodeURIComponent(context)}&body=${encodeURIComponent(bodyLines.join('\n'))}`
 }
 
 function getCurrentTimestamp() {
@@ -762,8 +774,121 @@ function EventsPage() {
 }
 
 function SettingsPage() {
-  const { user } = useAuth()
+  const { changePassword, updateProfile, uploadAvatar, user } = useAuth()
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState('')
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const avatarPreviewRef = useRef('')
   const avatarUrl = getAvatarUrl(user)
+  const avatarDisplayUrl = avatarPreview || avatarUrl
+  const {
+    register: registerProfileField,
+    handleSubmit: handleProfileSubmit,
+    reset: resetProfile,
+    formState: { isSubmitting: isSavingProfile },
+  } = useForm({
+    defaultValues: {
+      name: user?.name || '',
+      email: user?.email || '',
+    },
+  })
+  const {
+    register: registerPasswordField,
+    handleSubmit: handlePasswordSubmit,
+    reset: resetPassword,
+    formState: { isSubmitting: isSavingPassword },
+  } = useForm({
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  })
+
+  useEffect(() => {
+    resetProfile({
+      name: user?.name || '',
+      email: user?.email || '',
+    })
+  }, [resetProfile, user?.email, user?.name])
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewRef.current) {
+        URL.revokeObjectURL(avatarPreviewRef.current)
+      }
+    }
+  }, [])
+
+  function handleAvatarChange(event) {
+    const file = event.target.files?.[0] || null
+
+    if (avatarPreviewRef.current) {
+      URL.revokeObjectURL(avatarPreviewRef.current)
+      avatarPreviewRef.current = ''
+    }
+
+    setAvatarFile(file)
+    if (!file) {
+      setAvatarPreview('')
+      return
+    }
+
+    const previewUrl = URL.createObjectURL(file)
+    avatarPreviewRef.current = previewUrl
+    setAvatarPreview(previewUrl)
+  }
+
+  async function submitAvatar(event) {
+    event.preventDefault()
+
+    if (!avatarFile) {
+      toast.error('Choose an image first')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('avatar', avatarFile)
+    setIsUploadingAvatar(true)
+
+    try {
+      await uploadAvatar(formData)
+      setAvatarFile(null)
+      setAvatarPreview('')
+      toast.success('Avatar updated')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  async function submitProfile(values) {
+    try {
+      await updateProfile(values)
+      toast.success('Profile updated')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
+  async function submitPassword(values) {
+    if (values.newPassword !== values.confirmPassword) {
+      toast.error('New passwords do not match')
+      return
+    }
+
+    try {
+      await changePassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      })
+      resetPassword()
+      toast.success('Password changed')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -772,8 +897,8 @@ function SettingsPage() {
         <section className="rounded border border-slate-200 bg-white p-5">
           <div className="flex items-center gap-4">
             <span className="grid h-16 w-16 overflow-hidden rounded-full bg-slate-950 text-white">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              {avatarDisplayUrl ? (
+                <img src={avatarDisplayUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="grid h-full w-full place-items-center text-xl font-semibold">
                   {getUserInitial(user)}
@@ -790,19 +915,102 @@ function SettingsPage() {
             <SettingsRow label="Booking alerts" value="Sent to your account email" />
             <SettingsRow label="Support channel" value={supportEmail} />
           </div>
+          <form onSubmit={submitAvatar} className="mt-5 grid gap-3">
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Profile photo
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleAvatarChange}
+                className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-rose-500"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={isUploadingAvatar || !avatarFile}
+              className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              {isUploadingAvatar ? 'Uploading...' : 'Upload photo'}
+            </button>
+          </form>
         </section>
 
-        <section className="rounded border border-slate-200 bg-white p-5">
-          <h2 className="text-xl font-semibold text-slate-950">Preferences</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            Profile editing is not enabled yet, but your account details are ready for bookings, QR tickets, and event
-            updates.
-          </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <InfoTile icon={Mail} label="Email receipts" value="Enabled" />
-            <InfoTile icon={Ticket} label="Ticket delivery" value="QR code and booking email" />
-          </div>
-        </section>
+        <div className="grid gap-5">
+          <form onSubmit={handleProfileSubmit(submitProfile)} className="rounded border border-slate-200 bg-white p-5">
+            <h2 className="text-xl font-semibold text-slate-950">Profile details</h2>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Full name
+                <input
+                  {...registerProfileField('name', { required: true, minLength: 2 })}
+                  required
+                  minLength={2}
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Email
+                <input
+                  {...registerProfileField('email', { required: true })}
+                  type="email"
+                  required
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+            </div>
+            <button
+              type="submit"
+              disabled={isSavingProfile}
+              className="mt-5 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isSavingProfile ? 'Saving...' : 'Save profile'}
+            </button>
+          </form>
+
+          <form onSubmit={handlePasswordSubmit(submitPassword)} className="rounded border border-slate-200 bg-white p-5">
+            <h2 className="text-xl font-semibold text-slate-950">Change password</h2>
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Current password
+                <input
+                  {...registerPasswordField('currentPassword', { required: true })}
+                  type="password"
+                  required
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                  New password
+                  <input
+                    {...registerPasswordField('newPassword', { required: true, minLength: 8 })}
+                    type="password"
+                    required
+                    minLength={8}
+                    className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                  Confirm password
+                  <input
+                    {...registerPasswordField('confirmPassword', { required: true, minLength: 8 })}
+                    type="password"
+                    required
+                    minLength={8}
+                    className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                  />
+                </label>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={isSavingPassword}
+              className="mt-5 rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              {isSavingPassword ? 'Changing...' : 'Change password'}
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   )
@@ -829,27 +1037,131 @@ function AboutPage() {
 
 function ContactPage() {
   const { user } = useAuth()
+  const {
+    register: registerContactField,
+    handleSubmit: handleContactSubmit,
+    reset: resetContact,
+    formState: { isSubmitting },
+  } = useForm({
+    defaultValues: {
+      name: user?.name || '',
+      email: user?.email || '',
+      category: 'booking',
+      subject: '',
+      message: '',
+    },
+  })
+
+  useEffect(() => {
+    resetContact((current) => ({
+      ...current,
+      name: current.name || user?.name || '',
+      email: current.email || user?.email || '',
+    }))
+  }, [resetContact, user?.email, user?.name])
+
+  async function submitContact(values) {
+    try {
+      await api.post('/contact', values)
+      resetContact({
+        name: user?.name || '',
+        email: user?.email || '',
+        category: 'booking',
+        subject: '',
+        message: '',
+      })
+      toast.success('Support request sent')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <SectionTitle kicker="Support" title="Contact us" />
-      <section className="mt-6 rounded border border-slate-200 bg-white p-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-950">Event and booking help</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Email the Ticketo support/admin team for event publishing issues, booking questions, payment references,
-              ticket delivery, or account access.
-            </p>
-            <p className="mt-4 text-sm font-semibold text-slate-700">{supportEmail}</p>
+      <section className="mt-6 grid gap-6 rounded border border-slate-200 bg-white p-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-950">Event and booking help</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+            Send the Ticketo support/admin team a message for event publishing issues, booking questions, payment
+            references, ticket delivery, or account access.
+          </p>
+          <div className="mt-5 grid gap-3 text-sm">
+            <SettingsRow label="Support email" value={supportEmail} />
+            <SettingsRow label="Expected reply" value="Within 1 business day" />
           </div>
-          <a
-            href={getSupportMailto(user)}
-            className="inline-flex items-center justify-center gap-2 rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+        </div>
+
+        <form onSubmit={handleContactSubmit(submitContact)} className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Name
+              <input
+                {...registerContactField('name', { required: true, minLength: 2 })}
+                required
+                minLength={2}
+                className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Email
+              <input
+                {...registerContactField('email', { required: true })}
+                type="email"
+                required
+                className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+              />
+            </label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Category
+              <select
+                {...registerContactField('category', { required: true })}
+                className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+              >
+                {contactCategories.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Subject
+              <input
+                {...registerContactField('subject', { required: true, minLength: 4 })}
+                required
+                minLength={4}
+                className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+              />
+            </label>
+          </div>
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            Message
+            <textarea
+              {...registerContactField('message', { required: true, minLength: 10 })}
+              required
+              minLength={10}
+              rows={6}
+              className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-slate-950 outline-none focus:border-rose-500"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="inline-flex items-center justify-center gap-2 rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
             <Mail size={18} />
-            Email support
-          </a>
+            {isSubmitting ? 'Sending...' : 'Send message'}
+          </button>
+        </form>
+      </section>
+      <section className="mt-5 rounded border border-slate-200 bg-white p-5">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <InfoTile icon={Ticket} label="Bookings" value="Include your booking code or seat number if you have one." />
+          <InfoTile icon={CalendarDays} label="Events" value="Include the event name and city for faster support." />
+          <InfoTile icon={Mail} label="Email fallback" value={supportEmail} />
         </div>
       </section>
     </main>
@@ -1188,24 +1500,97 @@ function EventDetailPage() {
 function BookingsPage() {
   const [userBookings, setUserBookings] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [cancelTarget, setCancelTarget] = useState(null)
+
+  async function loadBookings() {
+    setIsLoading(true)
+
+    try {
+      const { data } = await api.get('/bookings/my')
+      setUserBookings(data.bookings || [])
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+      setUserBookings([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function loadBookings() {
-      setIsLoading(true)
-
-      try {
-        const { data } = await api.get('/bookings/my')
-        setUserBookings(data.bookings || [])
-      } catch (error) {
-        toast.error(getApiErrorMessage(error))
-        setUserBookings([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadBookings()
   }, [])
+
+  function downloadQr(booking) {
+    if (!booking.qrCode?.dataUrl) {
+      toast.error('QR code is unavailable')
+      return
+    }
+
+    const link = document.createElement('a')
+    link.href = booking.qrCode.dataUrl
+    link.download = `${booking.bookingCode}-qr.png`
+    link.click()
+  }
+
+  function printBooking(booking) {
+    if (!booking.qrCode?.dataUrl) {
+      toast.error('QR code is unavailable')
+      return
+    }
+
+    const event = booking.event ? normalizeEvent(booking.event) : null
+    const seatNumbers = booking.seats.map((seat) => seat.number).join(', ')
+    const printWindow = window.open('', '_blank', 'width=720,height=840')
+
+    if (!printWindow) {
+      toast.error('Allow popups to print this ticket')
+      return
+    }
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>${escapeMarkup(booking.bookingCode)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #17201d; padding: 32px; }
+            .ticket { border: 1px solid #dce6e2; padding: 24px; max-width: 560px; }
+            h1 { margin: 0 0 8px; font-size: 28px; }
+            p { margin: 8px 0; }
+            img { width: 180px; height: 180px; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <section class="ticket">
+            <h1>${escapeMarkup(event?.title || 'Ticketo booking')}</h1>
+            <p><strong>Booking code:</strong> ${escapeMarkup(booking.bookingCode)}</p>
+            <p><strong>Status:</strong> ${escapeMarkup(booking.status)}</p>
+            <p><strong>Seats:</strong> ${escapeMarkup(seatNumbers)}</p>
+            <p><strong>Total:</strong> ${escapeMarkup(`${booking.amount?.currency || 'INR'} ${Number(booking.amount?.total || 0).toLocaleString('en-IN')}`)}</p>
+            ${event ? `<p><strong>Venue:</strong> ${escapeMarkup(`${event.venue}, ${event.city}`)}</p>` : ''}
+            <img src="${booking.qrCode.dataUrl}" alt="Booking QR code" />
+          </section>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
+  async function cancelBooking() {
+    if (!cancelTarget) return
+
+    try {
+      await api.patch(`/bookings/${cancelTarget._id}/cancel`)
+      toast.success('Booking cancelled')
+      setCancelTarget(null)
+      loadBookings()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -1226,6 +1611,7 @@ function BookingsPage() {
         {!isLoading && userBookings.map((booking) => {
           const event = booking.event ? normalizeEvent(booking.event) : null
           const seatNumbers = booking.seats.map((seat) => seat.number)
+          const canUseTicket = booking.status === 'confirmed' && Boolean(booking.qrCode?.dataUrl)
           return (
             <article key={booking._id || booking.id} className="grid gap-4 rounded border border-slate-200 bg-white p-4 md:grid-cols-[160px_1fr_auto]">
               <EventPoster event={event} className="h-36 w-full rounded md:h-full" />
@@ -1243,45 +1629,119 @@ function BookingsPage() {
                   </p>
                 )}
               </div>
-              {booking.qrCode?.dataUrl ? (
-                <img src={booking.qrCode.dataUrl} alt={`${booking.bookingCode} QR code`} className="h-28 w-28 self-center rounded ring-1 ring-slate-200" />
-              ) : (
-                <div className="grid h-28 w-28 place-items-center self-center rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-center text-xs font-semibold text-slate-500">
-                  QR unavailable
+              <div className="grid justify-items-start gap-3 md:justify-items-end">
+                {booking.qrCode?.dataUrl ? (
+                  <img src={booking.qrCode.dataUrl} alt={`${booking.bookingCode} QR code`} className="h-28 w-28 rounded ring-1 ring-slate-200" />
+                ) : (
+                  <div className="grid h-28 w-28 place-items-center rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-center text-xs font-semibold text-slate-500">
+                    QR unavailable
+                  </div>
+                )}
+                <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+                  <button
+                    type="button"
+                    disabled={!canUseTicket}
+                    onClick={() => downloadQr(booking)}
+                    className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    <Download size={15} /> QR
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canUseTicket}
+                    onClick={() => printBooking(booking)}
+                    className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    <Printer size={15} /> Print
+                  </button>
+                  {booking.status === 'confirmed' && (
+                    <button
+                      type="button"
+                      onClick={() => setCancelTarget(booking)}
+                      className="inline-flex items-center gap-2 rounded border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700"
+                    >
+                      <Ban size={15} /> Cancel
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
             </article>
           )
         })}
       </div>
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl">
+            <h2 className="text-xl font-semibold text-slate-950">Cancel booking?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This will cancel booking <span className="font-semibold text-slate-700">{cancelTarget.bookingCode}</span>
+              and release the selected seats if the event has not started.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelTarget(null)}
+                className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
+              >
+                Keep booking
+              </button>
+              <button
+                type="button"
+                onClick={cancelBooking}
+                className="rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+              >
+                Cancel booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
 
 function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
+  const [supportMessages, setSupportMessages] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
-  useEffect(() => {
-    async function loadDashboard() {
-      setIsLoading(true)
-      setLoadError('')
+  async function loadDashboard() {
+    setIsLoading(true)
+    setLoadError('')
 
-      try {
-        const { data } = await api.get('/admin/dashboard')
-        setDashboard(data)
-      } catch (error) {
-        const message = getApiErrorMessage(error)
-        setLoadError(message)
-        toast.error(message)
-      } finally {
-        setIsLoading(false)
-      }
+    try {
+      const [{ data: dashboardData }, { data: contactData }] = await Promise.all([
+        api.get('/admin/dashboard'),
+        api.get('/admin/contact-messages', { params: { limit: 5 } }),
+      ])
+      setDashboard(dashboardData)
+      setSupportMessages(contactData.contactMessages || [])
+    } catch (error) {
+      const message = getApiErrorMessage(error)
+      setLoadError(message)
+      toast.error(message)
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboard()
   }, [])
+
+  async function updateSupportStatus(messageId, status) {
+    try {
+      const { data } = await api.patch(`/admin/contact-messages/${messageId}/status`, { status })
+      setSupportMessages((current) =>
+        current.map((message) => (message._id === messageId ? data.contactMessage : message)),
+      )
+      toast.success('Support message updated')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
 
   const stats = dashboard?.stats
   const performanceRows = dashboard?.eventPerformance || []
@@ -1306,14 +1766,15 @@ function AdminDashboardPage() {
           <ListChecks size={18} /> Manage events
         </Link>
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : '-'} icon={BarChart3} />
         <Stat label="Bookings" value={stats ? stats.bookings.toLocaleString('en-IN') : '-'} icon={Ticket} />
         <Stat label="Active users" value={stats ? stats.activeUsers.toLocaleString('en-IN') : '-'} icon={Users} />
         <Stat label="Fill rate" value={stats ? `${stats.fillRate}%` : '-'} icon={CheckCircle2} />
+        <Stat label="New support" value={stats ? (stats.supportMessages?.new || 0).toLocaleString('en-IN') : '-'} icon={Mail} />
       </div>
       {isLoading && <p className="mt-4 text-sm font-semibold text-slate-500">Loading dashboard analytics...</p>}
-      <div className="mt-6">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_0.9fr]">
         <div className="rounded border border-slate-200 bg-white p-5">
           <h2 className="text-xl font-semibold">Event performance</h2>
           <div className="mt-5 space-y-4">
@@ -1334,6 +1795,50 @@ function AdminDashboardPage() {
             ))}
           </div>
         </div>
+        <div className="rounded border border-slate-200 bg-white p-5">
+          <h2 className="text-xl font-semibold">Support queue</h2>
+          <div className="mt-5 space-y-4">
+            {!isLoading && supportMessages.length === 0 && (
+              <p className="text-sm font-semibold text-slate-500">No support messages yet.</p>
+            )}
+            {supportMessages.map((message) => (
+              <div key={message._id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-950">{message.subject}</p>
+                    <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                      {message.name} · {message.email}
+                    </p>
+                  </div>
+                  <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                    {message.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{message.message}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {message.status === 'new' && (
+                    <button
+                      type="button"
+                      onClick={() => updateSupportStatus(message._id, 'in_progress')}
+                      className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                    >
+                      Mark in progress
+                    </button>
+                  )}
+                  {message.status !== 'resolved' && (
+                    <button
+                      type="button"
+                      onClick={() => updateSupportStatus(message._id, 'resolved')}
+                      className="rounded border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700"
+                    >
+                      Resolve
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </main>
   )
@@ -1344,6 +1849,8 @@ function ManageEventsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingEvent, setEditingEvent] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const {
     register: registerEventField,
     handleSubmit: handleEventSubmit,
@@ -1373,6 +1880,38 @@ function ManageEventsPage() {
     loadEvents()
   }, [])
 
+  function openCreateForm() {
+    setEditingEvent(null)
+    resetEventForm(eventFormDefaults)
+    setShowForm(true)
+  }
+
+  function openEditForm(event) {
+    setEditingEvent(event)
+    resetEventForm({
+      ...eventFormDefaults,
+      title: event.title || '',
+      description: event.description || '',
+      category: event.category || 'Music',
+      venueName: event.venue?.name || '',
+      address: event.venue?.address || '',
+      city: event.venue?.city || '',
+      startsAt: formatDateTimeInput(event.startsAt),
+      priceFrom: event.priceFrom ?? '',
+      totalSeats: event.totalSeats ?? '',
+      status: event.status || 'draft',
+      posterFile: null,
+    })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function closeEventForm() {
+    setShowForm(false)
+    setEditingEvent(null)
+    resetEventForm(eventFormDefaults)
+  }
+
   async function submitEvent(values) {
     try {
       let poster
@@ -1385,7 +1924,7 @@ function ManageEventsPage() {
         poster = data.poster
       }
 
-      await api.post('/events', {
+      const payload = {
         title: values.title,
         description: values.description,
         category: values.category,
@@ -1398,12 +1937,20 @@ function ManageEventsPage() {
         priceFrom: values.priceFrom,
         totalSeats: values.totalSeats,
         status: values.status,
-        poster,
-      })
+      }
 
-      toast.success('Event created')
-      setShowForm(false)
-      resetEventForm(eventFormDefaults)
+      if (poster) {
+        payload.poster = poster
+      }
+
+      if (editingEvent) {
+        await api.patch(`/events/${editingEvent._id}`, payload)
+      } else {
+        await api.post('/events', payload)
+      }
+
+      toast.success(editingEvent ? 'Event updated' : 'Event created')
+      closeEventForm()
       loadEvents()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
@@ -1420,12 +1967,12 @@ function ManageEventsPage() {
     }
   }
 
-  async function deleteEvent(eventId) {
-    if (!window.confirm('Delete this event?')) return
-
+  async function deleteEvent() {
+    if (!deleteTarget) return
     try {
-      await api.delete(`/events/${eventId}`)
+      await api.delete(`/events/${deleteTarget._id}`)
       toast.success('Event deleted')
+      setDeleteTarget(null)
       loadEvents()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
@@ -1441,6 +1988,7 @@ function ManageEventsPage() {
     city: event.venue?.city,
     status: event.status,
     sold: event.totalSeats ? Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100) : 0,
+    raw: event,
   }))
 
   if (loadError) {
@@ -1461,15 +2009,27 @@ function ManageEventsPage() {
         <SectionTitle kicker="Admin" title="Manage events" />
         <button
           type="button"
-          onClick={() => setShowForm((value) => !value)}
+          onClick={() => {
+            if (showForm && !editingEvent) {
+              closeEventForm()
+            } else {
+              openCreateForm()
+            }
+          }}
           className="inline-flex w-fit items-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
         >
-          <Plus size={18} /> Create event
+          <Plus size={18} /> {showForm && !editingEvent ? 'Close form' : 'Create event'}
         </button>
       </div>
 
       {showForm && (
         <form onSubmit={handleEventSubmit(submitEvent)} className="mb-6 rounded border border-slate-200 bg-white p-5">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-slate-950">{editingEvent ? 'Edit event' : 'Create event'}</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {editingEvent ? 'Update event details and upload a new poster if needed.' : 'Create a draft event for review before publishing.'}
+            </p>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <AdminField label="Title" registration={registerEventField('title', { required: true })} required />
             <label className="grid gap-2 text-sm font-semibold text-slate-700">
@@ -1516,11 +2076,11 @@ function ManageEventsPage() {
               disabled={isSubmitting}
               className="rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {isSubmitting ? 'Saving...' : 'Save event'}
+              {isSubmitting ? 'Saving...' : editingEvent ? 'Update event' : 'Save event'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={closeEventForm}
               className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
             >
               Cancel
@@ -1576,6 +2136,13 @@ function ManageEventsPage() {
                   <td className="px-4 py-4">{event.sold}%</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(event.raw)}
+                        className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
+                      >
+                        <Edit3 size={15} /> Edit
+                      </button>
                       {event.status !== 'published' && (
                         <button
                           type="button"
@@ -1596,7 +2163,7 @@ function ManageEventsPage() {
                       )}
                       <button
                         type="button"
-                        onClick={() => deleteEvent(event.id)}
+                        onClick={() => setDeleteTarget(event.raw)}
                         className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
                       >
                         Delete
@@ -1609,6 +2176,33 @@ function ManageEventsPage() {
           </table>
         </div>
       </div>
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl">
+            <h2 className="text-xl font-semibold text-slate-950">Delete event?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This will permanently remove <span className="font-semibold text-slate-700">{deleteTarget.title}</span>.
+              Existing booking references may no longer show event details.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
+              >
+                Keep event
+              </button>
+              <button
+                type="button"
+                onClick={deleteEvent}
+                className="rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+              >
+                Delete event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

@@ -34,6 +34,7 @@ const envSchema = z.object({
   EMAIL_USER: optionalString,
   EMAIL_PASS: optionalString,
   EMAIL_FROM: z.string().default('Ticketo <no-reply@example.com>'),
+  SUPPORT_EMAIL: z.string().email().default('support@ticketo.events'),
 
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
