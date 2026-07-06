@@ -5,10 +5,14 @@ const env = require('../config/env')
 
 async function protect(req, res, next) {
   try {
-    let token = req.cookies?.token
+    let token
 
-    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    if (req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1]
+    }
+
+    if (!token) {
+      token = req.cookies?.token
     }
 
     if (!token) {

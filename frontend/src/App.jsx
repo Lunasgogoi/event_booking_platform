@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
 import toast, { Toaster } from 'react-hot-toast'
 import {
   BarChart3,
@@ -133,6 +134,26 @@ const adminEvents = events.map((event, index) => ({
   status: index % 3 === 0 ? 'Filling fast' : index % 3 === 1 ? 'Live' : 'Draft',
   revenue: (event.sold * event.priceFrom * 18).toLocaleString('en-IN'),
 }))
+
+const eventFormDefaults = {
+  title: '',
+  description: '',
+  category: 'Music',
+  venueName: '',
+  address: '',
+  city: '',
+  startsAt: '',
+  priceFrom: '',
+  totalSeats: '',
+  status: 'draft',
+  posterFile: null,
+}
+
+const authFormDefaults = {
+  name: '',
+  email: '',
+  password: '',
+}
 
 function normalizeEvent(event, index = 0) {
   if (event.date) {
@@ -829,21 +850,13 @@ function AdminDashboardPage() {
 function ManageEventsPage() {
   const [remoteEvents, setRemoteEvents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: 'Music',
-    venueName: '',
-    address: '',
-    city: '',
-    startsAt: '',
-    priceFrom: '',
-    totalSeats: '',
-    status: 'draft',
-    posterFile: null,
-  })
+  const {
+    register: registerEventField,
+    handleSubmit: handleEventSubmit,
+    reset: resetEventForm,
+    formState: { isSubmitting },
+  } = useForm({ defaultValues: eventFormDefaults })
 
   async function loadEvents() {
     setIsLoading(true)
@@ -863,61 +876,40 @@ function ManageEventsPage() {
     loadEvents()
   }, [])
 
-  function updateForm(event) {
-    const { files, name, value } = event.target
-    setFormData((current) => ({ ...current, [name]: files ? files[0] : value }))
-  }
-
-  async function submitEvent(event) {
-    event.preventDefault()
-    setIsSubmitting(true)
-
+  async function submitEvent(values) {
     try {
       let poster
+      const posterFile = values.posterFile?.[0]
 
-      if (formData.posterFile) {
+      if (posterFile) {
         const uploadData = new FormData()
-        uploadData.append('poster', formData.posterFile)
+        uploadData.append('poster', posterFile)
         const { data } = await api.post('/events/poster', uploadData)
         poster = data.poster
       }
 
       await api.post('/events', {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
+        title: values.title,
+        description: values.description,
+        category: values.category,
         venue: {
-          name: formData.venueName,
-          address: formData.address,
-          city: formData.city,
+          name: values.venueName,
+          address: values.address,
+          city: values.city,
         },
-        startsAt: formData.startsAt,
-        priceFrom: formData.priceFrom,
-        totalSeats: formData.totalSeats,
-        status: formData.status,
+        startsAt: values.startsAt,
+        priceFrom: values.priceFrom,
+        totalSeats: values.totalSeats,
+        status: values.status,
         poster,
       })
 
       toast.success('Event created')
       setShowForm(false)
-      setFormData({
-        title: '',
-        description: '',
-        category: 'Music',
-        venueName: '',
-        address: '',
-        city: '',
-        startsAt: '',
-        priceFrom: '',
-        totalSeats: '',
-        status: 'draft',
-        posterFile: null,
-      })
+      resetEventForm(eventFormDefaults)
       loadEvents()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -968,15 +960,14 @@ function ManageEventsPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={submitEvent} className="mb-6 rounded border border-slate-200 bg-white p-5">
+        <form onSubmit={handleEventSubmit(submitEvent)} className="mb-6 rounded border border-slate-200 bg-white p-5">
           <div className="grid gap-4 md:grid-cols-2">
-            <AdminField label="Title" name="title" value={formData.title} onChange={updateForm} required />
+            <AdminField label="Title" registration={registerEventField('title', { required: true })} required />
             <label className="grid gap-2 text-sm font-semibold text-slate-700">
               Category
               <select
-                name="category"
-                value={formData.category}
-                onChange={updateForm}
+                {...registerEventField('category', { required: true })}
+                required
                 className="h-11 rounded border border-slate-200 bg-slate-50 px-3 outline-none focus:border-rose-500"
               >
                 {['Music', 'Comedy', 'Business', 'Sports', 'Food', 'Arts', 'Technology', 'Other'].map((category) => (
@@ -984,19 +975,18 @@ function ManageEventsPage() {
                 ))}
               </select>
             </label>
-            <AdminField label="Venue name" name="venueName" value={formData.venueName} onChange={updateForm} required />
-            <AdminField label="City" name="city" value={formData.city} onChange={updateForm} required />
-            <AdminField label="Address" name="address" value={formData.address} onChange={updateForm} required />
-            <AdminField label="Start date" name="startsAt" type="datetime-local" value={formData.startsAt} onChange={updateForm} required />
-            <AdminField label="Price from" name="priceFrom" type="number" value={formData.priceFrom} onChange={updateForm} required min="0" />
-            <AdminField label="Total seats" name="totalSeats" type="number" value={formData.totalSeats} onChange={updateForm} required min="1" />
+            <AdminField label="Venue name" registration={registerEventField('venueName', { required: true })} required />
+            <AdminField label="City" registration={registerEventField('city', { required: true })} required />
+            <AdminField label="Address" registration={registerEventField('address', { required: true })} required />
+            <AdminField label="Start date" type="datetime-local" registration={registerEventField('startsAt', { required: true })} required />
+            <AdminField label="Price from" type="number" registration={registerEventField('priceFrom', { required: true, min: 0 })} required min="0" />
+            <AdminField label="Total seats" type="number" registration={registerEventField('totalSeats', { required: true, min: 1 })} required min="1" />
             <label className="grid gap-2 text-sm font-semibold text-slate-700">
               Poster image
               <input
-                name="posterFile"
+                {...registerEventField('posterFile')}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                onChange={updateForm}
                 className="h-11 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-rose-500"
               />
             </label>
@@ -1004,9 +994,7 @@ function ManageEventsPage() {
           <label className="mt-4 grid gap-2 text-sm font-semibold text-slate-700">
             Description
             <textarea
-              name="description"
-              value={formData.description}
-              onChange={updateForm}
+              {...registerEventField('description', { required: true, minLength: 20 })}
               required
               minLength={20}
               rows={4}
@@ -1167,30 +1155,21 @@ function ConnectedAuthPage({ mode }) {
   const navigate = useNavigate()
   const { login, register } = useAuth()
   const isRegister = mode === 'register'
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-  })
+  const {
+    register: registerAuthField,
+    handleSubmit: handleAuthSubmit,
+    formState: { isSubmitting },
+  } = useForm({ defaultValues: authFormDefaults })
 
-  function updateField(event) {
-    const { name, value } = event.target
-    setFormData((current) => ({ ...current, [name]: value }))
-  }
-
-  async function submitAuth(event) {
-    event.preventDefault()
-    setIsSubmitting(true)
-
+  async function submitAuth(values) {
     try {
       if (isRegister) {
-        await register(formData)
+        await register(values)
         toast.success('Account created')
       } else {
         await login({
-          email: formData.email,
-          password: formData.password,
+          email: values.email,
+          password: values.password,
         })
         toast.success('Logged in successfully')
       }
@@ -1198,8 +1177,6 @@ function ConnectedAuthPage({ mode }) {
       navigate('/events')
     } catch (error) {
       toast.error(getApiErrorMessage(error))
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -1209,7 +1186,7 @@ function ConnectedAuthPage({ mode }) {
         <div className="hidden bg-slate-950 md:block">
           <img src={events[1].image} alt="Event audience" className="h-full w-full object-cover opacity-80" />
         </div>
-        <form onSubmit={submitAuth} className="p-6 sm:p-8">
+        <form onSubmit={handleAuthSubmit(submitAuth)} className="p-6 sm:p-8">
           <div className="mb-6">
             <span className="grid h-11 w-11 place-items-center rounded bg-rose-600 text-white">
               <User size={22} />
@@ -1223,27 +1200,21 @@ function ConnectedAuthPage({ mode }) {
             {isRegister && (
               <AuthInput
                 label="Full name"
-                name="name"
                 placeholder="Aarav Sharma"
-                value={formData.name}
-                onChange={updateField}
+                registration={registerAuthField('name', { required: isRegister })}
               />
             )}
             <AuthInput
               label="Email"
-              name="email"
               placeholder="you@example.com"
               type="email"
-              value={formData.email}
-              onChange={updateField}
+              registration={registerAuthField('email', { required: true })}
             />
             <AuthInput
               label="Password"
-              name="password"
               placeholder="********"
               type="password"
-              value={formData.password}
-              onChange={updateField}
+              registration={registerAuthField('password', { required: true, minLength: isRegister ? 8 : 1 })}
               minLength={isRegister ? 8 : 1}
             />
           </div>
@@ -1464,15 +1435,13 @@ function Select({ value, onChange, options }) {
   )
 }
 
-function AdminField({ label, name, type = 'text', value, onChange, required = false, min }) {
+function AdminField({ label, type = 'text', registration, required = false, min }) {
   return (
     <label className="grid gap-2 text-sm font-medium text-slate-700">
       {label}
       <input
-        name={name}
+        {...registration}
         type={type}
-        value={value}
-        onChange={onChange}
         required={required}
         min={min}
         className="h-11 rounded border border-slate-200 bg-slate-50 px-3 outline-none focus:border-rose-500"
@@ -1481,17 +1450,15 @@ function AdminField({ label, name, type = 'text', value, onChange, required = fa
   )
 }
 
-function AuthInput({ label, type = 'text', placeholder, name, value, onChange, minLength }) {
+function AuthInput({ label, type = 'text', placeholder, minLength, registration }) {
   return (
     <label className="grid gap-2 text-sm font-medium text-slate-700">
       {label}
       <input
-        name={name}
         type={type}
         placeholder={placeholder}
-        value={value}
-        onChange={onChange}
         minLength={minLength}
+        {...registration}
         required
         className="h-12 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
       />
