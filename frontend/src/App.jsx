@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast, { Toaster } from 'react-hot-toast'
 import {
@@ -129,12 +129,6 @@ const bookings = [
   { id: 'BK-24064', eventId: 'laugh-lab', seats: ['C3'], status: 'Confirmed' },
 ]
 
-const adminEvents = events.map((event, index) => ({
-  ...event,
-  status: index % 3 === 0 ? 'Filling fast' : index % 3 === 1 ? 'Live' : 'Draft',
-  revenue: (event.sold * event.priceFrom * 18).toLocaleString('en-IN'),
-}))
-
 const eventFormDefaults = {
   title: '',
   description: '',
@@ -201,14 +195,50 @@ function App() {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
-          <Route path="/admin" element={<AdminDashboardPage />} />
-          <Route path="/admin/events" element={<ManageEventsPage />} />
+          <Route
+            path="/admin"
+            element={(
+              <AdminRoute>
+                <AdminDashboardPage />
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/events"
+            element={(
+              <AdminRoute>
+                <ManageEventsPage />
+              </AdminRoute>
+            )}
+          />
           <Route path="/login" element={<ConnectedAuthPage mode="login" />} />
           <Route path="/register" element={<ConnectedAuthPage mode="register" />} />
         </Routes>
       </Shell>
     </div>
   )
+}
+
+function AdminRoute({ children }) {
+  const { isAuthenticated, isBootstrapping, user } = useAuth()
+
+  if (isBootstrapping) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <p className="text-sm font-semibold text-slate-500">Checking access...</p>
+      </main>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/events" replace />
+  }
+
+  return children
 }
 
 function Shell({ children }) {
@@ -218,8 +248,8 @@ function Shell({ children }) {
   const links = [
     { to: '/events', label: 'Events' },
     { to: '/bookings', label: 'My bookings' },
-    { to: '/admin', label: 'Admin' },
-  ]
+    user?.role === 'admin' ? { to: '/admin', label: 'Admin' } : null,
+  ].filter(Boolean)
 
   async function handleLogout() {
     try {
@@ -433,7 +463,17 @@ function EventsPage() {
 
   const filteredEvents = useMemo(() => {
     return remoteEvents.filter((event) => {
-      const matchesQuery = event.title.toLowerCase().includes(query.toLowerCase())
+      const searchText = [
+        event.title,
+        event.category,
+        event.city,
+        event.venue,
+        event.description,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      const matchesQuery = !query || searchText.includes(query.toLowerCase())
       const matchesCategory = category === 'All' || event.category === category
       const matchesCity = city === 'All cities' || event.city === city
       return matchesQuery && matchesCategory && matchesCity
@@ -452,7 +492,7 @@ function EventsPage() {
             city: city === 'All cities' ? undefined : city,
           },
         })
-        setRemoteEvents(data.events?.length ? data.events.map(normalizeEvent) : events)
+        setRemoteEvents(data.events ? data.events.map(normalizeEvent) : [])
       } catch (error) {
         toast.error(getApiErrorMessage(error))
         setRemoteEvents(events)
@@ -770,16 +810,20 @@ function BookingsPage() {
 function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     async function loadDashboard() {
       setIsLoading(true)
+      setLoadError('')
 
       try {
         const { data } = await api.get('/admin/dashboard')
         setDashboard(data)
       } catch (error) {
-        toast.error(getApiErrorMessage(error))
+        const message = getApiErrorMessage(error)
+        setLoadError(message)
+        toast.error(message)
       } finally {
         setIsLoading(false)
       }
@@ -789,16 +833,19 @@ function AdminDashboardPage() {
   }, [])
 
   const stats = dashboard?.stats
-  const performanceRows = dashboard?.eventPerformance?.length
-    ? dashboard.eventPerformance
-    : adminEvents.slice(0, 5).map((event) => ({
-        id: event.id,
-        title: event.title,
-        city: event.city,
-        category: event.category,
-        sold: event.sold,
-        revenue: Number(event.revenue.replace(/,/g, '')),
-      }))
+  const performanceRows = dashboard?.eventPerformance || []
+
+  if (loadError) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <SectionTitle kicker="Admin" title="Dashboard" />
+        <div className="mt-6 rounded border border-rose-200 bg-white p-5 text-rose-700">
+          <p className="font-semibold">Admin dashboard unavailable</p>
+          <p className="mt-2 text-sm">{loadError}</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -809,16 +856,19 @@ function AdminDashboardPage() {
         </Link>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
-        <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : 'INR 38.4L'} icon={BarChart3} />
-        <Stat label="Bookings" value={stats ? stats.bookings.toLocaleString('en-IN') : '12,486'} icon={Ticket} />
-        <Stat label="Active users" value={stats ? stats.activeUsers.toLocaleString('en-IN') : '8,920'} icon={Users} />
-        <Stat label="Fill rate" value={stats ? `${stats.fillRate}%` : '74%'} icon={CheckCircle2} />
+        <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : '-'} icon={BarChart3} />
+        <Stat label="Bookings" value={stats ? stats.bookings.toLocaleString('en-IN') : '-'} icon={Ticket} />
+        <Stat label="Active users" value={stats ? stats.activeUsers.toLocaleString('en-IN') : '-'} icon={Users} />
+        <Stat label="Fill rate" value={stats ? `${stats.fillRate}%` : '-'} icon={CheckCircle2} />
       </div>
       {isLoading && <p className="mt-4 text-sm font-semibold text-slate-500">Loading dashboard analytics...</p>}
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="rounded border border-slate-200 bg-white p-5">
           <h2 className="text-xl font-semibold">Event performance</h2>
           <div className="mt-5 space-y-4">
+            {!isLoading && performanceRows.length === 0 && (
+              <p className="text-sm font-semibold text-slate-500">No booking performance data yet.</p>
+            )}
             {performanceRows.map((event) => (
               <div key={event.id} className="grid gap-3 sm:grid-cols-[1fr_140px_110px] sm:items-center">
                 <div>
@@ -850,6 +900,7 @@ function AdminDashboardPage() {
 function ManageEventsPage() {
   const [remoteEvents, setRemoteEvents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const {
     register: registerEventField,
@@ -860,12 +911,16 @@ function ManageEventsPage() {
 
   async function loadEvents() {
     setIsLoading(true)
+    setLoadError('')
 
     try {
       const { data } = await api.get('/events/admin/manage')
       setRemoteEvents(data.events)
     } catch (error) {
-      toast.error(getApiErrorMessage(error))
+      const message = getApiErrorMessage(error)
+      setLoadError(message)
+      setRemoteEvents([])
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
@@ -945,6 +1000,18 @@ function ManageEventsPage() {
     status: event.status,
     sold: event.totalSeats ? Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100) : 0,
   }))
+
+  if (loadError) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <SectionTitle kicker="Admin" title="Manage events" />
+        <div className="mt-6 rounded border border-rose-200 bg-white p-5 text-rose-700">
+          <p className="font-semibold">Event management unavailable</p>
+          <p className="mt-2 text-sm">{loadError}</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

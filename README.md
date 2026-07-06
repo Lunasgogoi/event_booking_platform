@@ -46,6 +46,7 @@ Current status: backend environment, app bootstrap, MongoDB, Redis, Cloudinary, 
 cd backend
 npm install
 copy .env.example .env
+npm run seed:admin
 npm run dev
 npm test
 ```
@@ -97,13 +98,16 @@ The login/register requests automatically save the returned JWT into the `token`
 
 Admin bootstrap:
 
-Set `ADMIN_EMAILS` in `backend/.env` before registering an admin user.
+Set seed admin credentials in `backend/.env`, then run the seed script once.
 
 ```bash
-ADMIN_EMAILS=your-email@example.com
+SEED_ADMIN_NAME=Admin User
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=password123
+npm run seed:admin
 ```
 
-Then register with that same email from the frontend. That user will be created with the `admin` role.
+The seed script creates that user if missing, or promotes the existing user with that email to the `admin` role. After that, admin login uses the normal `POST /api/auth/login` endpoint. Registration always creates regular users.
 
 Required local services for the backend server:
 

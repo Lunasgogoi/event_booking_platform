@@ -1,6 +1,18 @@
+const mongoose = require('mongoose')
 const Booking = require('../models/Booking')
 const Event = require('../models/Event')
 const User = require('../models/User')
+const ApiError = require('../utils/ApiError')
+
+function ensureObjectId(id) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, 'Invalid user id')
+  }
+}
+
+function isSelf(req, userId) {
+  return String(req.user._id) === String(userId)
+}
 
 async function getDashboardStats(req, res, next) {
   try {
@@ -83,6 +95,7 @@ async function getDashboardStats(req, res, next) {
 
     res.status(200).json({
       success: true,
+      message: 'Dashboard stats fetched successfully',
       stats: {
         revenue: totalRevenueResult[0]?.total || 0,
         bookings: bookingCount,
@@ -121,6 +134,101 @@ async function getDashboardStats(req, res, next) {
   }
 }
 
+async function getUsers(req, res, next) {
+  try {
+    const { search, role, status, page = 1, limit = 20 } = req.query
+    const query = {}
+
+    if (role) query.role = role
+    if (status === 'active') query.isActive = true
+    if (status === 'inactive') query.isActive = false
+    if (search?.trim()) {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const searchRegex = new RegExp(escapedSearch, 'i')
+      query.$or = [{ name: searchRegex }, { email: searchRegex }]
+    }
+
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize),
+      User.countDocuments(query),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Users fetched successfully',
+      users,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize),
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function updateUserRole(req, res, next) {
+  try {
+    const { userId } = req.params
+    const { role } = req.body
+    ensureObjectId(userId)
+
+    if (isSelf(req, userId) && role !== 'admin') {
+      throw new ApiError(400, 'You cannot remove your own admin role')
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { role }, { returnDocument: 'after', runValidators: true }).select('-password')
+    if (!user) {
+      throw new ApiError(404, 'User not found')
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'User role updated successfully',
+      user,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function updateUserStatus(req, res, next) {
+  try {
+    const { userId } = req.params
+    const { isActive } = req.body
+    ensureObjectId(userId)
+
+    if (isSelf(req, userId) && !isActive) {
+      throw new ApiError(400, 'You cannot deactivate your own account')
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { isActive }, { returnDocument: 'after', runValidators: true }).select('-password')
+    if (!user) {
+      throw new ApiError(404, 'User not found')
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'User status updated successfully',
+      user,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 module.exports = {
   getDashboardStats,
+  getUsers,
+  updateUserRole,
+  updateUserStatus,
 }

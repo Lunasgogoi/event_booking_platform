@@ -3,6 +3,7 @@ const Booking = require('../models/Booking')
 const Event = require('../models/Event')
 const ApiError = require('../utils/ApiError')
 const generateQR = require('../utils/generateQR')
+const { ensureEventIsBookable } = require('../utils/eventLifecycle')
 const { sendEmail } = require('../services/emailService')
 const { getSeatLockOwner, lockSeat, releaseSeatForUser, releaseSeatsForUser } = require('../services/seatLockService')
 const env = require('../config/env')
@@ -17,9 +18,7 @@ async function findBookableSeat(eventId, seatNumber) {
     throw new ApiError(404, 'Event not found')
   }
 
-  if (event.status !== 'published') {
-    throw new ApiError(400, 'Event is not open for booking')
-  }
+  ensureEventIsBookable(event)
 
   const seat = event.seats.find((item) => item.number === seatNumber)
   if (!seat) {
@@ -105,9 +104,7 @@ async function createBooking(req, res, next) {
         throw new ApiError(404, 'Event not found')
       }
 
-      if (event.status !== 'published') {
-        throw new ApiError(400, 'Event is not open for booking')
-      }
+      ensureEventIsBookable(event)
 
       const uniqueSeatNumbers = [...new Set(seatNumbers)]
       const selectedSeats = uniqueSeatNumbers.map((seatNumber) => {
@@ -134,6 +131,43 @@ async function createBooking(req, res, next) {
       const missingLock = lockOwners.find((lock) => lock.owner !== String(req.user._id))
       if (missingLock) {
         throw new ApiError(409, `Seat lock expired or belongs to another user: ${missingLock.seatNumber}`)
+      }
+
+      const seatUpdate = await Event.updateOne(
+        {
+          _id: event._id,
+          status: 'published',
+          startsAt: { $gt: new Date() },
+          $and: uniqueSeatNumbers.map((seatNumber) => ({
+            seats: {
+              $elemMatch: {
+                number: seatNumber,
+                status: 'available',
+              },
+            },
+          })),
+        },
+        {
+          $set: {
+            'seats.$[seat].status': 'booked',
+          },
+          $inc: {
+            availableSeats: -uniqueSeatNumbers.length,
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              'seat.number': { $in: uniqueSeatNumbers },
+              'seat.status': 'available',
+            },
+          ],
+          session,
+        },
+      )
+
+      if (seatUpdate.modifiedCount !== 1) {
+        throw new ApiError(409, 'One or more seats are no longer available')
       }
 
       const subtotal = selectedSeats.reduce((total, seat) => total + seat.price, 0)
@@ -171,27 +205,25 @@ async function createBooking(req, res, next) {
         { session },
       )
 
-      event.seats.forEach((seat) => {
-        if (uniqueSeatNumbers.includes(seat.number)) {
-          seat.status = 'booked'
-        }
-      })
-      event.availableSeats = event.seats.filter((seat) => seat.status === 'available').length
-      await event.save({ session })
-
-      await releaseSeatsForUser({
-        eventId,
-        seatNumbers: uniqueSeatNumbers,
-        userId: req.user._id,
-      })
-
       await booking.populate('event')
 
+      req.bookedSeatNumbers = uniqueSeatNumbers
       req.createdBooking = booking
     })
 
+    if (req.bookedSeatNumbers?.length) {
+      releaseSeatsForUser({
+        eventId,
+        seatNumbers: req.bookedSeatNumbers,
+        userId: req.user._id,
+      }).catch((error) => {
+        console.warn('Seat lock cleanup failed:', error.message)
+      })
+    }
+
     res.status(201).json({
       success: true,
+      message: 'Booking confirmed successfully',
       booking: req.createdBooking,
     })
 
@@ -230,13 +262,28 @@ async function sendBookingConfirmation(user, booking) {
 
 async function getMyBookings(req, res, next) {
   try {
-    const bookings = await Booking.find({ user: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('event')
+    const { page = 1, limit = 20 } = req.query
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+    const [bookings, total] = await Promise.all([
+      Booking.find({ user: req.user._id })
+        .sort({ createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .populate('event'),
+      Booking.countDocuments({ user: req.user._id }),
+    ])
 
     res.status(200).json({
       success: true,
+      message: 'Bookings fetched successfully',
       bookings,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize),
+      },
     })
   } catch (error) {
     next(error)

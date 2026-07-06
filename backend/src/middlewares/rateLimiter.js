@@ -9,6 +9,7 @@ const authLimiter = rateLimit({
   message: {
     success: false,
     message: 'Too many auth attempts. Please try again later.',
+    errors: [],
   },
 })
 
@@ -20,6 +21,7 @@ const bookingLimiter = rateLimit({
   message: {
     success: false,
     message: 'Too many booking attempts. Please try again shortly.',
+    errors: [],
   },
 })
 

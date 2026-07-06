@@ -19,16 +19,10 @@ function sendAuthResponse(res, statusCode, user) {
 
   res.status(statusCode).json({
     success: true,
+    message: statusCode === 201 ? 'Registered successfully' : 'Logged in successfully',
     token,
     user,
   })
-}
-
-function isAdminEmail(email) {
-  return env.ADMIN_EMAILS.split(',')
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email)
 }
 
 async function register(req, res, next) {
@@ -40,8 +34,7 @@ async function register(req, res, next) {
       throw new ApiError(409, 'Email is already registered')
     }
 
-    const role = isAdminEmail(email) ? 'admin' : 'user'
-    const user = await User.create({ name, email, password, role })
+    const user = await User.create({ name, email, password })
     sendAuthResponse(res, 201, user)
   } catch (error) {
     next(error)
@@ -59,10 +52,6 @@ async function login(req, res, next) {
 
     if (!user.isActive) {
       throw new ApiError(403, 'Your account is inactive')
-    }
-
-    if (isAdminEmail(email) && user.role !== 'admin') {
-      user.role = 'admin'
     }
 
     user.lastLoginAt = new Date()
@@ -85,6 +74,7 @@ function logout(req, res) {
 function getMe(req, res) {
   res.status(200).json({
     success: true,
+    message: 'Current user fetched successfully',
     user: req.user,
   })
 }

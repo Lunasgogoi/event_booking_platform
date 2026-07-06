@@ -34,7 +34,7 @@ function errorHandler(error, req, res, next) {
   res.status(statusCode).json({
     success: false,
     message,
-    errors,
+    errors: errors || [],
     stack: env.NODE_ENV === 'production' ? undefined : error.stack,
   })
 }

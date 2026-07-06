@@ -16,7 +16,9 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16).default('replace_with_a_long_random_secret'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   COOKIE_EXPIRES_DAYS: z.coerce.number().int().positive().default(7),
-  ADMIN_EMAILS: z.string().default(''),
+  SEED_ADMIN_NAME: z.string().default('Admin User'),
+  SEED_ADMIN_EMAIL: optionalString,
+  SEED_ADMIN_PASSWORD: optionalString,
 
   REDIS_URL: z.string().min(1).default('redis://127.0.0.1:6379'),
   SEAT_LOCK_TTL_SECONDS: z.coerce.number().int().positive().default(600),
