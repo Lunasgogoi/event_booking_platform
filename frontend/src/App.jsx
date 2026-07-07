@@ -62,6 +62,14 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { useAuth } from './context/useAuth'
 import api from './services/api'
@@ -2659,45 +2667,44 @@ function ManageEventsPage({ scope = 'admin' }) {
       )}
 
       <div className="overflow-hidden rounded border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Event</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">City</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Sold</th>
-                <th className="px-4 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
+          <Table className="min-w-[760px] text-left text-sm">
+            <TableHeader className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="px-4 py-3 text-slate-500">Event</TableHead>
+                <TableHead className="px-4 py-3 text-slate-500">Date</TableHead>
+                <TableHead className="px-4 py-3 text-slate-500">City</TableHead>
+                <TableHead className="px-4 py-3 text-slate-500">Status</TableHead>
+                <TableHead className="px-4 py-3 text-slate-500">Sold</TableHead>
+                <TableHead className="px-4 py-3 text-slate-500">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-200">
               {isLoading && (
-                <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
+                <TableRow>
+                  <TableCell colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
                     Loading events...
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
+                <TableRow>
+                  <TableCell colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
                     {isOrganizer ? 'No organizer events found. Create your first draft.' : isReviewQueue ? 'No events are waiting for review.' : 'No events found. Create your first event.'}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
               {!isLoading && displayRows.map((event) => event.type === 'section' ? (
-                <tr key={event.key} className="bg-slate-50">
-                  <td colSpan="6" className="px-4 py-3">
+                <TableRow key={event.key} className="bg-slate-50 hover:bg-slate-50">
+                  <TableCell colSpan="6" className="px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-sm font-semibold text-slate-950">{event.title}</p>
                       <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">{event.count}</span>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
-                <tr key={event.id}>
-                  <td className="px-4 py-4">
+                <TableRow key={event.id}>
+                  <TableCell className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <EventPoster event={event} className="h-12 w-16 rounded" />
                       <div>
@@ -2705,115 +2712,126 @@ function ManageEventsPage({ scope = 'admin' }) {
                         <p className="text-xs text-slate-500">{event.category}</p>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-4 py-4 font-semibold">{format(event.date, 'dd MMM yyyy')}</td>
-                  <td className="px-4 py-4">{event.city}</td>
-                  <td className="px-4 py-4">
-                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{formatEventStatus(event.status)}</span>
+                  </TableCell>
+                  <TableCell className="px-4 py-4 font-semibold">{format(event.date, 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="px-4 py-4">{event.city}</TableCell>
+                  <TableCell className="px-4 py-4">
+                    <Badge variant="secondary" className="h-auto rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                      {formatEventStatus(event.status)}
+                    </Badge>
                     {isOrganizer && event.status === 'approved' && (
                       <p className="mt-2 text-xs font-semibold text-emerald-700">
                         {event.publishing?.feeAmount > 0 ? `${formatINR(event.publishing.feeAmount)} due` : 'No publishing fee'}
                       </p>
                     )}
-                  </td>
-                  <td className="px-4 py-4">{event.sold}%</td>
-                  <td className="px-4 py-4">
+                  </TableCell>
+                  <TableCell className="px-4 py-4">{event.sold}%</TableCell>
+                  <TableCell className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
                       {event.canEdit && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => openEditForm(event.raw)}
                           className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
                         >
                           <Edit3 size={15} /> Edit
-                        </button>
+                        </Button>
                       )}
                       {event.canSubmit && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => submitOrganizerDraft(event.id)}
                           className="rounded border border-slate-300 px-3 py-2 font-medium"
                         >
                           Submit
-                        </button>
+                        </Button>
                       )}
                       {event.canPublishOrganizer && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => publishOrganizerEvent(event.id)}
                           className="rounded border border-emerald-200 px-3 py-2 font-medium text-emerald-700"
                         >
                           Publish
-                        </button>
+                        </Button>
                       )}
                       {event.canPublish && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => updateEventStatus(event.id, 'publish')}
                           className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
                         >
                           <Edit3 size={15} /> Publish
-                        </button>
+                        </Button>
                       )}
                       {event.canMarkUnderReview && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => reviewEvent(event.id, 'under_review')}
                           className="rounded border border-slate-300 px-3 py-2 font-medium"
                         >
                           Review
-                        </button>
+                        </Button>
                       )}
                       {event.canReview && (
                         <>
-                          <button
+                          <Button
+                            variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'approved')}
                             className="rounded border border-emerald-200 px-3 py-2 font-medium text-emerald-700"
                           >
                             Approve
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'changes_requested')}
                             className="rounded border border-amber-200 px-3 py-2 font-medium text-amber-700"
                           >
                             Changes
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'rejected')}
                             className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
                           >
                             Reject
-                          </button>
+                          </Button>
                         </>
                       )}
                       {event.canCancel && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => updateEventStatus(event.id, 'cancel')}
                           className="rounded border border-slate-300 px-3 py-2 font-medium"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       )}
                       {event.canDelete && (
-                        <button
+                        <Button
+                          variant="outline"
                           type="button"
                           onClick={() => setDeleteTarget(event.raw)}
                           className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
                         >
                           Delete
-                        </button>
+                        </Button>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
       </div>
       <AlertDialog
         open={Boolean(deleteTarget)}
