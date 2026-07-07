@@ -12,7 +12,7 @@ There is no root `package.json`. Run frontend and backend commands from their ow
 
 ## Frontend
 
-Current status: connected UI with auth, profile settings, avatar upload, public event browsing, event detail, admin event management, Cloudinary poster uploads, Redis seat locking, booking confirmation, QR tickets, booking cancellation, support contact, confirmation emails, and My Bookings connected to the backend.
+Current status: connected UI with auth, profile settings, avatar upload, public event browsing, event detail, admin event management, Cloudinary poster uploads, Redis seat locking, Razorpay payment checkout, booking confirmation, QR tickets, booking cancellation, support contact, confirmation emails, and My Bookings connected to the backend.
 
 ```bash
 cd frontend
@@ -25,7 +25,7 @@ Included UI screens:
 - Home and event discovery
 - Search/filter events
 - Event details with dummy seat selection
-- Event details with Redis-backed temporary seat locking for database events
+- Event details with Redis-backed temporary seat locking and Razorpay checkout for database events
 - Login/register UI
 - Profile menu, editable settings, password change, and avatar upload
 - My bookings with QR ticket display, QR download, print, and cancellation
@@ -42,7 +42,7 @@ VITE_API_BASE_URL=http://localhost:5000/api
 
 ## Backend
 
-Current status: backend environment, app bootstrap, MongoDB, Redis, Cloudinary, email, cache, seat-lock config, data models, and auth APIs are scaffolded.
+Current status: backend environment, app bootstrap, MongoDB, Redis, Razorpay payments, Cloudinary, email, cache, seat-lock config, data models, and auth APIs are scaffolded.
 
 ```bash
 cd backend
@@ -85,7 +85,8 @@ Seat-lock endpoints:
 
 Booking endpoints:
 
-- `POST /api/bookings`
+- `POST /api/bookings` - creates a Razorpay order for the selected locked seats
+- `POST /api/bookings/verify-payment` - verifies Razorpay payment signature and confirms the booking
 - `GET /api/bookings/my`
 - `PATCH /api/bookings/:bookingId/cancel`
 
@@ -131,17 +132,30 @@ Required local services for the backend server:
 
 Cloudinary variables are required for poster and avatar uploads. SMTP variables are optional in development; confirmation and support emails are skipped if SMTP is not configured, but support messages are still stored in MongoDB.
 
+Razorpay variables are required for paid bookings:
+
+```bash
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_CURRENCY=INR
+RAZORPAY_BUSINESS_NAME=Ticketo
+```
+
+The backend creates a Razorpay order before checkout, then confirms the booking only after server-side verification of `razorpay_payment_id`, `razorpay_order_id`, and `razorpay_signature`. Configure automatic payment capture in Razorpay so successful checkout payments reach the `captured` status before fulfilment.
+
 Useful production checks:
 
 - Set a strong `JWT_SECRET`; the default is rejected in production.
 - Set `CLIENT_URL` to the deployed frontend URL so CORS and cookies work.
 - Set `QR_CODE_BASE_URL` to the deployed ticket URL base.
 - Set `SUPPORT_EMAIL` to the admin/support inbox.
+- Set Razorpay live keys on the backend before accepting real payments.
 - Configure Cloudinary before enabling poster or avatar uploads.
 - Configure SMTP if booking confirmations and support notifications should be emailed.
 - Use HTTPS in production so secure cookies work correctly.
+- Deploy the frontend from `frontend/` on Vercel. `frontend/vercel.json` rewrites browser routes to `index.html`.
+- Deploy the backend from `backend/` on Render with `npm install` as the build command and `npm start` as the start command.
 
 Planned backend features:
 
-- Payment integration
 - Broader integration tests for cancellation, support messages, and upload edge cases

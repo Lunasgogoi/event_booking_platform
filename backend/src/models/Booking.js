@@ -81,6 +81,25 @@ const bookingSchema = new mongoose.Schema(
       enum: ['not_required', 'pending', 'paid', 'failed', 'refunded'],
       default: 'pending',
     },
+    payment: {
+      provider: {
+        type: String,
+        enum: ['razorpay'],
+      },
+      razorpayOrderId: {
+        type: String,
+        trim: true,
+      },
+      razorpayPaymentId: {
+        type: String,
+        trim: true,
+      },
+      razorpaySignature: {
+        type: String,
+        trim: true,
+      },
+      paidAt: Date,
+    },
     qrCode: {
       dataUrl: String,
       payload: String,
@@ -96,5 +115,6 @@ const bookingSchema = new mongoose.Schema(
 
 bookingSchema.index({ user: 1, createdAt: -1 })
 bookingSchema.index({ event: 1, status: 1 })
+bookingSchema.index({ 'payment.razorpayPaymentId': 1 }, { unique: true, sparse: true })
 
 module.exports = mongoose.model('Booking', bookingSchema)

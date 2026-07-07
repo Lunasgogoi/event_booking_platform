@@ -36,6 +36,11 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default('Ticketo <no-reply@example.com>'),
   SUPPORT_EMAIL: z.string().email().default('support@ticketo.events'),
 
+  RAZORPAY_KEY_ID: optionalString,
+  RAZORPAY_KEY_SECRET: optionalString,
+  RAZORPAY_CURRENCY: z.string().length(3).default('INR'),
+  RAZORPAY_BUSINESS_NAME: z.string().default('Ticketo'),
+
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   BOOKING_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60 * 1000),
@@ -56,6 +61,10 @@ const env = parsedEnv.data
 
 if (env.NODE_ENV === 'production' && env.JWT_SECRET === 'replace_with_a_long_random_secret') {
   throw new Error('JWT_SECRET must be changed in production')
+}
+
+if (env.NODE_ENV === 'production' && (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET)) {
+  throw new Error('Razorpay credentials must be configured in production')
 }
 
 module.exports = env

@@ -119,6 +119,30 @@ function formatDuration(totalSeconds) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
+const RAZORPAY_CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js'
+
+function loadRazorpayCheckout() {
+  if (window.Razorpay) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${RAZORPAY_CHECKOUT_SRC}"]`)
+    if (existingScript) {
+      existingScript.addEventListener('load', resolve, { once: true })
+      existingScript.addEventListener('error', () => reject(new Error('Unable to load Razorpay Checkout')), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = RAZORPAY_CHECKOUT_SRC
+    script.async = true
+    script.onload = resolve
+    script.onerror = () => reject(new Error('Unable to load Razorpay Checkout'))
+    document.body.appendChild(script)
+  })
+}
+
 function formatDateTimeInput(value) {
   if (!value) {
     return ''
@@ -1322,12 +1346,56 @@ function EventDetailPage() {
     setIsBooking(true)
 
     try {
-      await api.post('/bookings', {
+      const bookingPayload = {
         eventId: event.mongoId,
         seatNumbers: selectedSeats,
+      }
+      const { data } = await api.post('/bookings', bookingPayload)
+      const payment = data.payment
+
+      await loadRazorpayCheckout()
+
+      await new Promise((resolve, reject) => {
+        const checkout = new window.Razorpay({
+          key: payment.keyId,
+          amount: payment.amount,
+          currency: payment.currency,
+          name: payment.businessName,
+          description: event.title,
+          order_id: payment.orderId,
+          prefill: {
+            name: data.user?.name || '',
+            email: data.user?.email || '',
+          },
+          theme: {
+            color: '#e11d48',
+          },
+          handler: async (response) => {
+            try {
+              await api.post('/bookings/verify-payment', {
+                ...bookingPayload,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
+              toast.success('Booking confirmed')
+              navigate('/bookings')
+              resolve()
+            } catch (error) {
+              reject(error)
+            }
+          },
+          modal: {
+            ondismiss: () => reject(new Error('Payment cancelled')),
+          },
+        })
+
+        checkout.on('payment.failed', (response) => {
+          reject(new Error(response.error?.description || 'Payment failed'))
+        })
+
+        checkout.open()
       })
-      toast.success('Booking confirmed')
-      navigate('/bookings')
     } catch (error) {
       toast.error(getApiErrorMessage(error))
     } finally {
@@ -1467,7 +1535,7 @@ function EventDetailPage() {
             onClick={confirmBooking}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            <CreditCard size={18} /> {isBooking ? 'Confirming...' : 'Confirm booking'}
+            <CreditCard size={18} /> {isBooking ? 'Opening payment...' : 'Pay and confirm'}
           </button>
         </aside>
       </section>
@@ -1488,7 +1556,7 @@ function EventDetailPage() {
               onClick={confirmBooking}
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              <CreditCard size={17} /> {formatINR(subtotal + fees)}
+              <CreditCard size={17} /> {isBooking ? 'Paying...' : formatINR(subtotal + fees)}
             </button>
           </div>
         </div>
