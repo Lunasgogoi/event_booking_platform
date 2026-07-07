@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const test = require('node:test')
 const jwt = require('jsonwebtoken')
 const ApiError = require('../src/utils/ApiError')
@@ -9,6 +10,7 @@ const {
 } = require('../src/utils/eventLifecycle')
 const generateToken = require('../src/utils/generateToken')
 const env = require('../src/config/env')
+const { verifyPaymentSignature } = require('../src/services/razorpayService')
 
 test('ApiError carries status code and message', () => {
   const error = new ApiError(404, 'Not found')
@@ -49,4 +51,38 @@ test('event lifecycle rejects past events', () => {
   assert.throws(() => ensureEventIsPublic(event), /Event not found/)
   assert.throws(() => ensureEventIsBookable(event), /Event has already started/)
   assert.throws(() => ensureEventCanBePublished({ ...event, status: 'draft' }), /Past events cannot be published/)
+})
+
+test('Razorpay signature verification accepts authentic checkout response', (t) => {
+  const originalSecret = env.RAZORPAY_KEY_SECRET
+  env.RAZORPAY_KEY_SECRET = 'test_razorpay_secret'
+  t.after(() => {
+    env.RAZORPAY_KEY_SECRET = originalSecret
+  })
+
+  const orderId = 'order_test_123'
+  const paymentId = 'pay_test_456'
+  const signature = crypto
+    .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
+    .update(`${orderId}|${paymentId}`)
+    .digest('hex')
+
+  assert.equal(verifyPaymentSignature({ orderId, paymentId, signature }), true)
+})
+
+test('Razorpay signature verification rejects tampered checkout response', (t) => {
+  const originalSecret = env.RAZORPAY_KEY_SECRET
+  env.RAZORPAY_KEY_SECRET = 'test_razorpay_secret'
+  t.after(() => {
+    env.RAZORPAY_KEY_SECRET = originalSecret
+  })
+
+  assert.equal(
+    verifyPaymentSignature({
+      orderId: 'order_test_123',
+      paymentId: 'pay_tampered',
+      signature: '0'.repeat(64),
+    }),
+    false,
+  )
 })

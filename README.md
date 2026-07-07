@@ -24,7 +24,6 @@ Included UI screens:
 
 - Home and event discovery
 - Search/filter events
-- Event details with dummy seat selection
 - Event details with Redis-backed temporary seat locking and Razorpay checkout for database events
 - Login/register UI
 - Profile menu, editable settings, password change, and avatar upload
@@ -147,6 +146,7 @@ Useful production checks:
 
 - Set a strong `JWT_SECRET`; the default is rejected in production.
 - Set `CLIENT_URL` to the deployed frontend URL so CORS and cookies work.
+- Set `CLIENT_URLS` to any additional comma-separated frontend origins, such as Vercel preview or custom domains.
 - Set `QR_CODE_BASE_URL` to the deployed ticket URL base.
 - Set `SUPPORT_EMAIL` to the admin/support inbox.
 - Set Razorpay live keys on the backend before accepting real payments.

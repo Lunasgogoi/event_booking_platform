@@ -97,6 +97,18 @@ test('unknown route returns 404 response shape', async () => {
   assert.match(response.body.message, /Route not found/)
 })
 
+test('disallowed browser origins are rejected by CORS', async () => {
+  const response = await request('GET', '/health', {
+    headers: {
+      Origin: 'https://malicious.example.com',
+    },
+  })
+
+  assert.equal(response.status, 403)
+  assert.equal(response.body.success, false)
+  assert.equal(response.body.message, 'Not allowed by CORS')
+})
+
 test('protected routes require authentication', async () => {
   const response = await request('GET', '/api/admin/dashboard')
 

@@ -19,7 +19,6 @@ let server
 let baseUrl
 let mongoAvailable = false
 let redisAvailable = false
-let transactionsAvailable = false
 
 function futureDate(minutes = 60) {
   return new Date(Date.now() + minutes * 60 * 1000)
@@ -124,8 +123,6 @@ before(async () => {
   try {
     await connectDB()
     mongoAvailable = true
-    const hello = await mongoose.connection.db.admin().command({ hello: 1 })
-    transactionsAvailable = Boolean(hello.setName || hello.msg === 'isdbgrid')
   } catch (error) {
     console.warn(`Skipping DB-backed tests because MongoDB is unavailable: ${error.message}`)
     return
@@ -358,13 +355,9 @@ test('seat lock and release flow works against MongoDB and Redis', { timeout: 30
   assert.equal(releasedSeatsResponse.body.seats.find((seat) => seat.number === 'G1').status, 'available')
 })
 
-test('booking confirmation marks the seat booked when MongoDB transactions are available', { timeout: 30000 }, async (t) => {
+test('booking order creation requires configured Razorpay after seat lock', { timeout: 30000 }, async (t) => {
   if (!mongoAvailable) t.skip('MongoDB is unavailable')
   if (!redisAvailable) t.skip('Redis is unavailable')
-  if (!transactionsAvailable) {
-    t.skip('MongoDB transactions require a replica set member or mongos')
-    return
-  }
 
   const admin = await createUser('admin', 'admin-confirm-booking')
   const user = await createUser('user', 'user-confirm-booking')
@@ -391,12 +384,8 @@ test('booking confirmation marks the seat booked when MongoDB transactions are a
     },
   })
 
-  assert.equal(bookingResponse.status, 201, JSON.stringify(bookingResponse.body))
-  assert.equal(bookingResponse.body.booking.status, 'confirmed')
-
-  const bookedSeatsResponse = await api('GET', `/api/events/${eventId}/seats`)
-  assert.equal(bookedSeatsResponse.status, 200)
-  assert.equal(bookedSeatsResponse.body.seats.find((seat) => seat.number === 'G1').status, 'booked')
+  assert.equal(bookingResponse.status, 503, JSON.stringify(bookingResponse.body))
+  assert.equal(bookingResponse.body.message, 'Payment gateway is not configured')
 
   const duplicateLockResponse = await api('POST', '/api/bookings/lock-seat', {
     headers: bearer(user._id),

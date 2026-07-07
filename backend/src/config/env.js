@@ -5,11 +5,19 @@ const { z } = require('zod')
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
 const optionalString = z.preprocess((value) => (value === '' ? undefined : value), z.string().optional())
+const optionalUrlList = z.preprocess((value) => {
+  if (typeof value !== 'string' || value.trim() === '') return undefined
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}, z.array(z.string().url()).optional())
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(5000),
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
+  CLIENT_URLS: optionalUrlList,
 
   MONGO_URI: z.string().min(1).default('mongodb://127.0.0.1:27017/event_booking_platform'),
 
@@ -65,6 +73,24 @@ if (env.NODE_ENV === 'production' && env.JWT_SECRET === 'replace_with_a_long_ran
 
 if (env.NODE_ENV === 'production' && (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET)) {
   throw new Error('Razorpay credentials must be configured in production')
+}
+
+const localServicePattern = /localhost|127\.0\.0\.1/
+
+if (env.NODE_ENV === 'production' && localServicePattern.test(env.MONGO_URI)) {
+  throw new Error('MONGO_URI must point to a production database')
+}
+
+if (env.NODE_ENV === 'production' && localServicePattern.test(env.REDIS_URL)) {
+  throw new Error('REDIS_URL must point to a production Redis instance')
+}
+
+if (env.NODE_ENV === 'production' && localServicePattern.test(env.CLIENT_URL)) {
+  throw new Error('CLIENT_URL must point to the deployed frontend URL')
+}
+
+if (env.NODE_ENV === 'production' && localServicePattern.test(env.QR_CODE_BASE_URL)) {
+  throw new Error('QR_CODE_BASE_URL must point to the deployed frontend ticket URL')
 }
 
 module.exports = env

@@ -6,7 +6,7 @@ const {
   registerSchema,
   updateProfileSchema,
 } = require('../src/validators/authValidator')
-const { createBookingSchema, seatLockSchema } = require('../src/validators/bookingValidator')
+const { createBookingSchema, seatLockSchema, verifyPaymentSchema } = require('../src/validators/bookingValidator')
 const { createContactMessageSchema, updateContactMessageStatusSchema } = require('../src/validators/contactValidator')
 const { createEventSchema } = require('../src/validators/eventValidator')
 
@@ -106,4 +106,15 @@ test('seat lock schema accepts event id and seat number', () => {
   })
 
   assert.equal(result.success, true)
+})
+
+test('payment verification schema requires Razorpay checkout fields', () => {
+  const result = verifyPaymentSchema.safeParse({
+    eventId: '507f1f77bcf86cd799439011',
+    seatNumbers: ['G1'],
+    razorpay_order_id: 'order_test_123',
+    razorpay_payment_id: 'pay_test_456',
+  })
+
+  assert.equal(result.success, false)
 })

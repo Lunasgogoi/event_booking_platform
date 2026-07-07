@@ -12,10 +12,23 @@ const eventRoutes = require('./routes/eventRoutes')
 const { errorHandler, notFound } = require('./middlewares/errorMiddleware')
 
 const app = express()
+const allowedOrigins = new Set([env.CLIENT_URL, ...(env.CLIENT_URLS || [])])
+
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
 
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        return callback(null, true)
+      }
+
+      const error = new Error('Not allowed by CORS')
+      error.statusCode = 403
+      return callback(error)
+    },
     credentials: true,
   }),
 )
