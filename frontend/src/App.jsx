@@ -1,29 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast, { Toaster } from 'react-hot-toast'
 import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   CreditCard,
   Ban,
   Download,
   Edit3,
   Filter,
-  Info,
   ListChecks,
-  LogOut,
   Mail,
-  Menu,
-  Moon,
   Plus,
   Printer,
   Search,
-  Settings,
-  Sun,
   Ticket,
   User,
   Users,
@@ -39,23 +32,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
 import {
   Table,
   TableBody,
@@ -87,6 +65,7 @@ import {
   SeatLegend,
   Select,
 } from '@/components/forms'
+import { Shell } from '@/components/layout'
 import {
   authFormDefaults,
   categories,
@@ -105,11 +84,12 @@ import {
   formatOrganizerStatus,
 } from '@/lib/formatters'
 import { getInitialTheme } from '@/lib/theme'
+import { AppRoutes } from '@/routes/AppRoutes'
 import {
-  AdminRoute,
-  OrganizerRoute,
-  ProtectedRoute,
-} from '@/routes/guards'
+  getAvatarUrl,
+  getOrganizerLink,
+  getUserInitial,
+} from '@/lib/user'
 import { useAuth } from './context/useAuth'
 import api from './services/api'
 import { getApiErrorMessage } from './services/api'
@@ -155,36 +135,6 @@ function escapeMarkup(value) {
     .replace(/'/g, '&#39;')
 }
 
-function getUserInitial(user) {
-  const source = user?.name || user?.email || 'User'
-  return source.trim().charAt(0).toUpperCase()
-}
-
-function getAvatarUrl(user) {
-  return user?.avatar?.url || user?.avatarUrl || ''
-}
-
-function getOrganizerLink(user) {
-  if (user?.role === 'organizer') {
-    return { to: '/organizer/events', label: 'Organizer dashboard' }
-  }
-
-  const status = user?.organizerProfile?.status || 'none'
-  if (status === 'pending') {
-    return { to: '/organizer/apply', label: 'Organizer request' }
-  }
-
-  if (status === 'rejected') {
-    return { to: '/organizer/apply', label: 'Apply again' }
-  }
-
-  if (status === 'suspended') {
-    return { to: '/organizer/apply', label: 'Organizer status' }
-  }
-
-  return { to: '/organizer/apply', label: 'Become organizer' }
-}
-
 function getCurrentTimestamp() {
   return Date.now()
 }
@@ -219,308 +169,23 @@ function App() {
         }}
       />
       <Shell theme={theme} onToggleTheme={toggleTheme}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route path="/events/:eventId" element={<EventDetailPage />} />
-          <Route path="/bookings" element={<BookingsPage />} />
-          <Route
-            path="/settings"
-            element={(
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            )}
-          />
-          <Route
-            path="/organizer/apply"
-            element={(
-              <ProtectedRoute>
-                <OrganizerApplyPage />
-              </ProtectedRoute>
-            )}
-          />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route
-            path="/admin"
-            element={(
-              <AdminRoute>
-                <AdminDashboardPage />
-              </AdminRoute>
-            )}
-          />
-          <Route
-            path="/admin/events"
-            element={(
-              <AdminRoute>
-                <ManageEventsPage />
-              </AdminRoute>
-            )}
-          />
-          <Route
-            path="/admin/reviews"
-            element={(
-              <AdminRoute>
-                <ManageEventsPage scope="review" />
-              </AdminRoute>
-            )}
-          />
-          <Route
-            path="/organizer/events"
-            element={(
-              <OrganizerRoute>
-                <ManageEventsPage scope="organizer" />
-              </OrganizerRoute>
-            )}
-          />
-          <Route path="/login" element={<ConnectedAuthPage mode="login" />} />
-          <Route path="/register" element={<ConnectedAuthPage mode="register" />} />
-        </Routes>
+        <AppRoutes
+          pages={{
+            HomePage,
+            EventsPage,
+            EventDetailPage,
+            BookingsPage,
+            SettingsPage,
+            OrganizerApplyPage,
+            AboutPage,
+            ContactPage,
+            AdminDashboardPage,
+            ManageEventsPage,
+            ConnectedAuthPage,
+          }}
+        />
       </Shell>
     </div>
-  )
-}
-
-function ThemeToggle({ isDark, onToggleTheme }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggleTheme}
-      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="grid h-10 w-10 place-items-center rounded border border-slate-300 text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-    >
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
-  )
-}
-
-function ProfileMenu({ user, onLogout }) {
-  const avatarUrl = getAvatarUrl(user)
-  const initial = getUserInitial(user)
-  const organizerLink = getOrganizerLink(user)
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        className="inline-flex h-10 items-center gap-2 rounded border border-slate-300 bg-white px-1.5 pr-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-        aria-haspopup="menu"
-        aria-label="Open profile menu"
-      >
-        <Avatar className="h-8 w-8 bg-slate-950 text-white">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
-          <AvatarFallback className="bg-slate-950 text-sm font-semibold text-white">{initial}</AvatarFallback>
-        </Avatar>
-        <ChevronDown size={16} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="w-72 overflow-hidden rounded border border-slate-200 bg-white p-0 shadow-2xl">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <p className="truncate text-sm font-semibold text-slate-950">{user?.name || 'Ticketo user'}</p>
-          <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{user?.email}</p>
-        </div>
-        <div className="p-2">
-          <DropdownMenuItem render={<Link to="/settings" />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-            <Settings size={17} className="text-slate-400" />
-            Settings
-          </DropdownMenuItem>
-          <DropdownMenuItem render={<Link to="/about" />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-            <Info size={17} className="text-slate-400" />
-            About us
-          </DropdownMenuItem>
-          {user?.role !== 'admin' && (
-            <DropdownMenuItem render={<Link to={organizerLink.to} />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-              <Users size={17} className="text-slate-400" />
-              {organizerLink.label}
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem render={<Link to="/contact" />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-            <Mail size={17} className="text-slate-400" />
-            Contact us
-          </DropdownMenuItem>
-        </div>
-        <DropdownMenuSeparator className="m-0 bg-slate-200" />
-        <div className="p-2">
-          <DropdownMenuItem
-            onClick={onLogout}
-            variant="destructive"
-            className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
-          >
-            <LogOut size={17} />
-            Logout
-          </DropdownMenuItem>
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function Shell({ children, theme, onToggleTheme }) {
-  const [open, setOpen] = useState(false)
-  const navigate = useNavigate()
-  const { isAuthenticated, logout, user } = useAuth()
-  const isDark = theme === 'dark'
-  const organizerLink = getOrganizerLink(user)
-
-  const links = [
-    { to: '/events', label: 'Events' },
-    { to: '/bookings', label: 'My bookings' },
-    user?.role !== 'admin' ? organizerLink : null,
-    user?.role === 'admin' ? { to: '/admin', label: 'Admin' } : null,
-  ].filter(Boolean)
-
-  async function handleLogout() {
-    try {
-      await logout()
-      navigate('/')
-      toast.success('Logged out successfully')
-    } catch (error) {
-      toast.error(getApiErrorMessage(error))
-    }
-  }
-
-  return (
-    <>
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-normal">
-            <span className="grid h-9 w-9 place-items-center rounded bg-rose-600 text-white">
-              <Ticket size={20} />
-            </span>
-            Ticketo
-          </Link>
-
-          <nav className="hidden items-center gap-1 md:flex">
-            {links.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  `rounded px-3 py-2 text-sm font-semibold transition ${
-                    isActive ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100'
-                  }`
-                }
-              >
-                {link.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="hidden items-center gap-2 md:flex">
-            <ThemeToggle isDark={isDark} onToggleTheme={onToggleTheme} />
-            {isAuthenticated ? (
-              <ProfileMenu user={user} onLogout={handleLogout} />
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="rounded bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-rose-700"
-                >
-                  Register
-                </Link>
-              </>
-            )}
-          </div>
-
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger
-              className="grid h-10 w-10 place-items-center rounded border border-slate-300 md:hidden"
-              aria-label="Toggle navigation"
-            >
-              <Menu size={20} />
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[min(22rem,90vw)] border-slate-200 bg-white p-0 md:hidden">
-              <SheetHeader className="border-b border-slate-200 px-4 py-4 text-left">
-                <SheetTitle className="flex items-center gap-2 text-lg font-semibold tracking-normal">
-                  <span className="grid h-9 w-9 place-items-center rounded bg-rose-600 text-white">
-                    <Ticket size={20} />
-                  </span>
-                  Ticketo
-                </SheetTitle>
-              </SheetHeader>
-              <div className="grid gap-2 px-4 py-3">
-                {links.map((link) => (
-                  <NavLink
-                    key={link.to}
-                    to={link.to}
-                    onClick={() => setOpen(false)}
-                    className="rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    {link.label}
-                  </NavLink>
-                ))}
-                <button
-                  type="button"
-                  onClick={onToggleTheme}
-                  className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  {isDark ? <Sun size={17} /> : <Moon size={17} />}
-                  {isDark ? 'Light mode' : 'Dark mode'}
-                </button>
-                {isAuthenticated ? (
-                  <>
-                    <div className="flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3">
-                      <Avatar className="h-10 w-10 shrink-0 bg-slate-950 text-white">
-                        {getAvatarUrl(user) && <AvatarImage src={getAvatarUrl(user)} alt="" />}
-                        <AvatarFallback className="bg-slate-950 text-sm font-semibold text-white">
-                          {getUserInitial(user)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-slate-950">{user?.name}</span>
-                        <span className="block truncate text-xs font-medium text-slate-500">{user?.email}</span>
-                      </span>
-                    </div>
-                    <Link
-                      to="/settings"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                    >
-                      <Settings size={17} /> Settings
-                    </Link>
-                    <Link
-                      to="/about"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                    >
-                      <Info size={17} /> About us
-                    </Link>
-                    <Link
-                      to="/contact"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                    >
-                      <Mail size={17} /> Contact us
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpen(false)
-                        handleLogout()
-                      }}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
-                    >
-                      <LogOut size={17} /> Logout
-                    </button>
-                  </>
-                ) : (
-                  <Link to="/login" onClick={() => setOpen(false)} className="rounded px-3 py-2 text-sm font-semibold">
-                    Login
-                  </Link>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
-      {children}
-    </>
   )
 }
 
