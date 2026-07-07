@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast, { Toaster } from 'react-hot-toast'
 import {
@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -61,7 +61,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -70,6 +69,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  EmptyState,
+  FieldIcon,
+  InfoBox,
+  LoadingPanel,
+  SectionHeader,
+  SectionTitle,
+  Stat,
+  SummaryRow,
+} from '@/components/shared'
 import {
   authFormDefaults,
   categories,
@@ -89,7 +98,11 @@ import {
   formatOrganizerStatus,
 } from '@/lib/formatters'
 import { getInitialTheme } from '@/lib/theme'
-import { cn } from '@/lib/utils'
+import {
+  AdminRoute,
+  OrganizerRoute,
+  ProtectedRoute,
+} from '@/routes/guards'
 import { useAuth } from './context/useAuth'
 import api from './services/api'
 import { getApiErrorMessage } from './services/api'
@@ -260,68 +273,6 @@ function App() {
       </Shell>
     </div>
   )
-}
-
-function ProtectedRoute({ children }) {
-  const { isAuthenticated, isBootstrapping } = useAuth()
-
-  if (isBootstrapping) {
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <p className="text-sm font-semibold text-slate-500">Checking access...</p>
-      </main>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  return children
-}
-
-function AdminRoute({ children }) {
-  const { isAuthenticated, isBootstrapping, user } = useAuth()
-
-  if (isBootstrapping) {
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <p className="text-sm font-semibold text-slate-500">Checking access...</p>
-      </main>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (user?.role !== 'admin') {
-    return <Navigate to="/events" replace />
-  }
-
-  return children
-}
-
-function OrganizerRoute({ children }) {
-  const { isAuthenticated, isBootstrapping, user } = useAuth()
-
-  if (isBootstrapping) {
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <p className="text-sm font-semibold text-slate-500">Checking access...</p>
-      </main>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (user?.role !== 'organizer') {
-    return <Navigate to="/settings" replace />
-  }
-
-  return children
 }
 
 function ThemeToggle({ isDark, onToggleTheme }) {
@@ -2982,47 +2933,6 @@ function EventMeta({ event, light = false }) {
   )
 }
 
-function EmptyState({ icon: Icon, title, message, actionLabel, actionTo, onAction }) {
-  const actionClass = 'mt-5 h-11 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800'
-
-  return (
-    <Card className="rounded border border-dashed border-slate-300 bg-white py-0 text-center ring-0">
-      <CardContent className="p-8">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded bg-slate-100 text-slate-700">
-          <Icon size={22} />
-        </span>
-        <h2 className="mt-4 text-xl font-semibold text-slate-950">{title}</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{message}</p>
-        {actionTo && (
-          <Link to={actionTo} className={cn(buttonVariants(), actionClass)}>
-            {actionLabel}
-          </Link>
-        )}
-        {onAction && (
-          <Button type="button" onClick={onAction} className={actionClass}>
-            {actionLabel}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function LoadingPanel({ label }) {
-  return (
-    <Card className="rounded border border-slate-200 bg-white py-0 text-center ring-0">
-      <CardContent className="p-6" aria-busy="true" aria-live="polite">
-        <p className="text-sm font-semibold text-slate-500">{label}</p>
-        <div className="mx-auto mt-4 grid max-w-md gap-2">
-          <Skeleton className="mx-auto h-3 w-44" />
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="mx-auto h-3 w-2/3" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function AuthVisual() {
   return (
     <div className="hidden bg-slate-950 p-8 text-white md:flex md:flex-col md:justify-between">
@@ -3033,51 +2943,6 @@ function AuthVisual() {
         <p className="text-sm font-semibold uppercase tracking-wide text-white/55">Ticketo</p>
         <h2 className="mt-3 text-3xl font-semibold leading-tight">Manage access to bookings, events, and tickets.</h2>
       </div>
-    </div>
-  )
-}
-
-function SectionHeader({ title, action, to }) {
-  return (
-    <div className="mb-5 flex items-center justify-between gap-4">
-      <h2 className="text-2xl font-semibold tracking-normal">{title}</h2>
-      <Link to={to} className="text-sm font-semibold text-rose-600 hover:text-rose-700">
-        {action}
-      </Link>
-    </div>
-  )
-}
-
-function SectionTitle({ kicker, title }) {
-  return (
-    <div>
-      <p className="text-sm font-semibold uppercase tracking-wide text-rose-600">{kicker}</p>
-      <h1 className="mt-1 text-3xl font-semibold tracking-normal">{title}</h1>
-    </div>
-  )
-}
-
-function Stat({ icon: Icon, label, value }) {
-  return (
-    <Card className="rounded border border-slate-200 bg-white py-0 ring-0">
-      <CardContent className="p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <span className="grid h-10 w-10 place-items-center rounded bg-rose-50 text-rose-600">
-            <Icon size={20} />
-          </span>
-        </div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
-  )
-}
-
-function InfoBox({ label, value }) {
-  return (
-    <div className="rounded border border-white/10 bg-white/10 p-4">
-      <p className="text-sm font-medium text-white/65">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
     </div>
   )
 }
@@ -3098,24 +2963,6 @@ function SeatLegend() {
         </span>
       ))}
     </div>
-  )
-}
-
-function SummaryRow({ label, value, strong = false }) {
-  return (
-    <div className={`flex items-center justify-between gap-4 ${strong ? 'text-lg font-semibold' : 'text-slate-600'}`}>
-      <span>{label}</span>
-      <span className={strong ? '' : 'font-semibold text-slate-950'}>{value}</span>
-    </div>
-  )
-}
-
-function FieldIcon({ icon: Icon, children }) {
-  return (
-    <label className="flex min-h-12 items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600">
-      <Icon size={18} className="shrink-0 text-slate-400" />
-      {children}
-    </label>
   )
 }
 
