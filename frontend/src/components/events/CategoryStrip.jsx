@@ -11,8 +11,8 @@ export function CategoryStrip() {
           to={getCategoryPath(category)}
           className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
             index === 0
-              ? 'border-slate-950 bg-slate-950 text-white'
-              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950'
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           {category}

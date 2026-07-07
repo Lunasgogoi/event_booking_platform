@@ -5,6 +5,7 @@ import { Filter, Search } from 'lucide-react'
 import { EmptyState, FieldIcon, LoadingPanel } from '@/components/shared'
 import { EventGrid } from '@/components/events'
 import { Select } from '@/components/forms'
+import { Input } from '@/components/ui/input'
 import { categories } from '@/lib/constants'
 import { getCategoryFromSearchParams, normalizeEvent } from '@/lib/events'
 import api, { getApiErrorMessage } from '@/services/api'
@@ -90,16 +91,16 @@ export function EventsPage() {
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-rose-600">Explore</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-normal text-slate-950">Browse events</h1>
+          <p className="text-sm font-medium uppercase tracking-wide text-primary">Explore</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-normal text-foreground">Browse events</h1>
         </div>
         <div className="flex flex-wrap gap-3">
           <FieldIcon icon={Search}>
-            <input
+            <Input
               value={query}
               onChange={(event) => handleQueryChange(event.target.value)}
               placeholder="Search events"
-              className="w-full bg-transparent outline-none"
+              className="h-auto w-full border-0 bg-transparent px-0 py-0 focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
             />
           </FieldIcon>
           <Select value={category} onChange={(event) => handleCategoryChange(event.target.value)} options={categories} />
@@ -110,7 +111,7 @@ export function EventsPage() {
           />
         </div>
       </div>
-      <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-500">
+      <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
         <Filter size={16} /> {isLoading ? 'Loading events...' : `${filteredEvents.length} events available`}
       </div>
       {isLoading ? (

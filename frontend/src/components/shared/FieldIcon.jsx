@@ -1,7 +1,7 @@
 export function FieldIcon({ icon: Icon, children }) {
   return (
-    <label className="flex min-h-12 items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600">
-      <Icon size={18} className="shrink-0 text-slate-400" />
+    <label className="flex min-h-12 items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+      <Icon size={18} className="shrink-0 text-muted-foreground/70" />
       {children}
     </label>
   )

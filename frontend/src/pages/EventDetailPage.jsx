@@ -5,6 +5,8 @@ import { CalendarDays, Clock3, CreditCard } from 'lucide-react'
 import { EmptyState, InfoBox, LoadingPanel, SummaryRow } from '@/components/shared'
 import { EventMeta, EventPoster } from '@/components/events'
 import { SeatLegend } from '@/components/forms'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { normalizeEvent } from '@/lib/events'
 import { formatDuration, formatINR } from '@/lib/formatters'
 import { useAuth } from '@/context/useAuth'
@@ -271,7 +273,7 @@ export function EventDetailPage() {
             <EventPoster event={event} className="h-[420px] w-full" />
           </div>
           <div className="flex flex-col justify-center">
-            <span className="mb-4 w-fit rounded bg-white px-3 py-1 text-sm font-semibold text-slate-950">{event.category}</span>
+            <Badge variant="secondary" className="mb-4 w-fit bg-white px-3 py-1 text-sm font-semibold text-black">{event.category}</Badge>
             <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">{event.title}</h1>
             <EventMeta event={event} light />
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -284,11 +286,11 @@ export function EventDetailPage() {
       </section>
 
       <section className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
-        <div className="rounded border border-slate-200 bg-white p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold">Select seats</h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {selectedSeats.length
                   ? `Your hold expires in ${formatDuration(holdSecondsRemaining)}.`
                   : 'Pick your preferred seats to continue.'}
@@ -300,7 +302,7 @@ export function EventDetailPage() {
               </span>
             )}
           </div>
-          <div className="mb-5 rounded bg-slate-100 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="mb-5 rounded-lg bg-muted py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Stage
           </div>
           <SeatLegend />
@@ -318,10 +320,10 @@ export function EventDetailPage() {
                     title={isLocked ? 'Unavailable seat' : isSelected ? 'Your selected seat' : 'Available seat'}
                     className={`h-11 rounded text-sm font-semibold transition ${
                       isLocked
-                        ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+                        ? 'cursor-not-allowed bg-muted text-muted-foreground/60'
                         : isSelected
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-slate-50 text-slate-700 hover:bg-slate-200'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-foreground ring-1 ring-border hover:bg-muted'
                     }`}
                   >
                     {seat}
@@ -330,13 +332,13 @@ export function EventDetailPage() {
               })}
             </div>
           ) : (
-            <div className="rounded border border-dashed border-slate-300 p-6 text-center text-sm font-semibold text-slate-500">
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm font-semibold text-muted-foreground">
               No seats are configured for this event.
             </div>
           )}
         </div>
 
-        <aside className="h-fit rounded border border-slate-200 bg-white p-5">
+        <aside className="h-fit rounded-lg border border-border bg-card p-5">
           <h2 className="text-xl font-semibold">Booking summary</h2>
           <div className="mt-4 space-y-3 text-sm">
             <SummaryRow label="Tickets" value={`${selectedSeats.length} selected`} />
@@ -347,42 +349,42 @@ export function EventDetailPage() {
             <SummaryRow label="Price" value={`INR ${subtotal.toLocaleString('en-IN')}`} />
             <SummaryRow label="Fees" value={`INR ${fees}`} />
           </div>
-          <div className="mt-5 border-t border-slate-200 pt-4">
+          <div className="mt-5 border-t border-border pt-4">
             <SummaryRow
               label="Total"
               value={`INR ${(subtotal + fees).toLocaleString('en-IN')}`}
               strong
             />
           </div>
-          <button
+          <Button
             type="button"
             disabled={!selectedSeats.length || isBooking}
             onClick={confirmBooking}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="mt-5 w-full px-4 py-3 text-sm font-semibold"
           >
             <CreditCard size={18} /> {isBooking ? 'Opening payment...' : 'Pay and confirm'}
-          </button>
+          </Button>
         </aside>
       </section>
       {selectedSeats.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white p-4 shadow-2xl lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background p-4 shadow-2xl lg:hidden">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-950">
+              <p className="truncate text-sm font-semibold text-foreground">
                 {selectedSeats.length} {selectedSeats.length === 1 ? 'seat' : 'seats'} selected
               </p>
               <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
                 <Clock3 size={14} /> {formatDuration(holdSecondsRemaining)} remaining
               </p>
             </div>
-            <button
+            <Button
               type="button"
               disabled={isBooking}
               onClick={confirmBooking}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="shrink-0 px-4 py-3 text-sm font-semibold"
             >
               <CreditCard size={17} /> {isBooking ? 'Paying...' : formatINR(subtotal + fees)}
-            </button>
+            </Button>
           </div>
         </div>
       )}

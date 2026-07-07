@@ -10,8 +10,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { buttonVariants } from '@/components/ui/button'
 import { useAuth } from '@/context/useAuth'
 import { getAvatarUrl, getOrganizerLink, getUserInitial } from '@/lib/user'
+import { cn } from '@/lib/utils'
 import { getApiErrorMessage } from '@/services/api'
 import { ProfileMenu } from './ProfileMenu'
 import { ThemeToggle } from './ThemeToggle'
@@ -42,10 +44,10 @@ export function Shell({ children, theme, onToggleTheme }) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-normal">
-            <span className="grid h-9 w-9 place-items-center rounded bg-rose-600 text-white">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
               <Ticket size={20} />
             </span>
             Ticketo
@@ -57,8 +59,8 @@ export function Shell({ children, theme, onToggleTheme }) {
                 key={link.to}
                 to={link.to}
                 className={({ isActive }) =>
-                  `rounded px-3 py-2 text-sm font-semibold transition ${
-                    isActive ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100'
+                  `rounded-md px-3 py-2 text-sm font-semibold transition ${
+                    isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`
                 }
               >
@@ -75,13 +77,13 @@ export function Shell({ children, theme, onToggleTheme }) {
               <>
                 <Link
                   to="/login"
-                  className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+                  className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'h-10 px-4')}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="rounded bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-rose-700"
+                  className={cn(buttonVariants({ size: 'lg' }), 'h-10 px-4 shadow-sm')}
                 >
                   Register
                 </Link>
@@ -91,15 +93,15 @@ export function Shell({ children, theme, onToggleTheme }) {
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
-              className="grid h-10 w-10 place-items-center rounded border border-slate-300 md:hidden"
+              className="grid h-10 w-10 place-items-center rounded-lg border border-border text-foreground md:hidden"
               aria-label="Toggle navigation"
             >
               <Menu size={20} />
             </SheetTrigger>
-            <SheetContent side="right" className="w-[min(22rem,90vw)] border-slate-200 bg-white p-0 md:hidden">
-              <SheetHeader className="border-b border-slate-200 px-4 py-4 text-left">
+            <SheetContent side="right" className="w-[min(22rem,90vw)] border-border bg-popover p-0 md:hidden">
+              <SheetHeader className="border-b border-border px-4 py-4 text-left">
                 <SheetTitle className="flex items-center gap-2 text-lg font-semibold tracking-normal">
-                  <span className="grid h-9 w-9 place-items-center rounded bg-rose-600 text-white">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
                     <Ticket size={20} />
                   </span>
                   Ticketo
@@ -111,7 +113,7 @@ export function Shell({ children, theme, onToggleTheme }) {
                     key={link.to}
                     to={link.to}
                     onClick={() => setOpen(false)}
-                    className="rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                    className="rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     {link.label}
                   </NavLink>
@@ -119,43 +121,43 @@ export function Shell({ children, theme, onToggleTheme }) {
                 <button
                   type="button"
                   onClick={onToggleTheme}
-                  className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                   {isDark ? <Sun size={17} /> : <Moon size={17} />}
                   {isDark ? 'Light mode' : 'Dark mode'}
                 </button>
                 {isAuthenticated ? (
                   <>
-                    <div className="flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3">
-                      <Avatar className="h-10 w-10 shrink-0 bg-slate-950 text-white">
+                    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-3">
+                      <Avatar className="h-10 w-10 shrink-0 bg-primary text-primary-foreground">
                         {getAvatarUrl(user) && <AvatarImage src={getAvatarUrl(user)} alt="" />}
-                        <AvatarFallback className="bg-slate-950 text-sm font-semibold text-white">
+                        <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
                           {getUserInitial(user)}
                         </AvatarFallback>
                       </Avatar>
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-slate-950">{user?.name}</span>
-                        <span className="block truncate text-xs font-medium text-slate-500">{user?.email}</span>
+                        <span className="block truncate text-sm font-semibold text-foreground">{user?.name}</span>
+                        <span className="block truncate text-xs font-medium text-muted-foreground">{user?.email}</span>
                       </span>
                     </div>
                     <Link
                       to="/settings"
                       onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                       <Settings size={17} /> Settings
                     </Link>
                     <Link
                       to="/about"
                       onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                       <Info size={17} /> About us
                     </Link>
                     <Link
                       to="/contact"
                       onClick={() => setOpen(false)}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                       <Mail size={17} /> Contact us
                     </Link>
@@ -165,13 +167,13 @@ export function Shell({ children, theme, onToggleTheme }) {
                         setOpen(false)
                         handleLogout()
                       }}
-                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                      className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-destructive hover:bg-destructive/10"
                     >
                       <LogOut size={17} /> Logout
                     </button>
                   </>
                 ) : (
-                  <Link to="/login" onClick={() => setOpen(false)} className="rounded px-3 py-2 text-sm font-semibold">
+                  <Link to="/login" onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground">
                     Login
                   </Link>
                 )}

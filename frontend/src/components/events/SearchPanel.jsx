@@ -21,16 +21,16 @@ export function SearchPanel() {
   }
 
   return (
-    <form onSubmit={submitSearch} className="grid gap-3 rounded border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_auto]">
+    <form onSubmit={submitSearch} className="grid gap-3 rounded-lg border border-border bg-card p-3 shadow-sm md:grid-cols-[1fr_auto]">
       <FieldIcon icon={Search}>
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search events"
-          className="h-auto w-full border-0 bg-transparent px-0 py-0 text-sm font-normal text-slate-950 outline-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+          className="h-auto w-full border-0 bg-transparent px-0 py-0 text-sm font-normal text-foreground focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
       </FieldIcon>
-      <Button type="submit" className="h-12 rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+      <Button type="submit" className="h-12 px-5 py-3 text-sm font-semibold">
         Search
       </Button>
     </form>

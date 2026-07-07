@@ -3,19 +3,6 @@ import { Toaster } from 'react-hot-toast'
 import { Shell } from '@/components/layout'
 import { getInitialTheme } from '@/lib/theme'
 import { AppRoutes } from '@/routes/AppRoutes'
-import {
-  AboutPage,
-  AdminDashboardPage,
-  BookingsPage,
-  ConnectedAuthPage,
-  ContactPage,
-  EventDetailPage,
-  EventsPage,
-  HomePage,
-  ManageEventsPage,
-  OrganizerApplyPage,
-  SettingsPage,
-} from '@/pages'
 
 function App() {
   const [theme, setTheme] = useState(getInitialTheme)
@@ -32,7 +19,7 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'theme-dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'}`}>
+    <div className={`min-h-screen bg-background text-foreground ${isDark ? 'theme-dark' : ''}`}>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -47,21 +34,7 @@ function App() {
         }}
       />
       <Shell theme={theme} onToggleTheme={toggleTheme}>
-        <AppRoutes
-          pages={{
-            HomePage,
-            EventsPage,
-            EventDetailPage,
-            BookingsPage,
-            SettingsPage,
-            OrganizerApplyPage,
-            AboutPage,
-            ContactPage,
-            AdminDashboardPage,
-            ManageEventsPage,
-            ConnectedAuthPage,
-          }}
-        />
+        <AppRoutes />
       </Shell>
     </div>
   )

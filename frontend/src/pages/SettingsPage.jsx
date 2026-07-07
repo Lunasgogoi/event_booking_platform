@@ -4,11 +4,15 @@ import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import { Users } from 'lucide-react'
 import { SectionTitle } from '@/components/shared'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { supportEmail } from '@/lib/constants'
 import { formatOrganizerStatus } from '@/lib/formatters'
 import { getAvatarUrl, getOrganizerLink, getUserInitial } from '@/lib/user'
 import { useAuth } from '@/context/useAuth'
 import { getApiErrorMessage } from '@/services/api'
+import { cn } from '@/lib/utils'
 
 export function SettingsPage() {
   const { changePassword, updateProfile, uploadAvatar, user } = useAuth()
@@ -133,9 +137,9 @@ export function SettingsPage() {
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <SectionTitle kicker="Account" title="Settings" />
       <div className="mt-6 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="rounded border border-slate-200 bg-white p-5">
+        <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 overflow-hidden rounded-full bg-slate-950 text-white">
+            <span className="grid h-16 w-16 overflow-hidden rounded-full bg-primary text-primary-foreground">
               {avatarDisplayUrl ? (
                 <img src={avatarDisplayUrl} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -145,8 +149,8 @@ export function SettingsPage() {
               )}
             </span>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold text-slate-950">{user?.name || 'Ticketo user'}</h2>
-              <p className="mt-1 truncate text-sm font-medium text-slate-500">{user?.email}</p>
+              <h2 className="truncate text-xl font-semibold text-foreground">{user?.name || 'Ticketo user'}</h2>
+              <p className="mt-1 truncate text-sm font-medium text-muted-foreground">{user?.email}</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 text-sm">
@@ -158,110 +162,112 @@ export function SettingsPage() {
             <SettingsRow label="Support channel" value={supportEmail} />
           </div>
           <form onSubmit={submitAvatar} className="mt-5 grid gap-3">
-            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            <Label className="grid gap-2 text-sm font-semibold text-foreground">
               Profile photo
-              <input
+              <Input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={handleAvatarChange}
-                className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-rose-500"
+                className="h-auto bg-muted/40 px-3 py-2 text-sm"
               />
-            </label>
-            <button
+            </Label>
+            <Button
               type="submit"
+              variant="outline"
               disabled={isUploadingAvatar || !avatarFile}
-              className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="px-4 py-3 text-sm font-semibold"
             >
               {isUploadingAvatar ? 'Uploading...' : 'Upload photo'}
-            </button>
+            </Button>
           </form>
         </section>
 
         <div className="grid gap-5">
-          <form onSubmit={handleProfileSubmit(submitProfile)} className="rounded border border-slate-200 bg-white p-5">
-            <h2 className="text-xl font-semibold text-slate-950">Profile details</h2>
+          <form onSubmit={handleProfileSubmit(submitProfile)} className="rounded-lg border border-border bg-card p-5">
+            <h2 className="text-xl font-semibold text-foreground">Profile details</h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              <Label className="grid gap-2 text-sm font-semibold text-foreground">
                 Full name
-                <input
+                <Input
                   {...registerProfileField('name', { required: true, minLength: 2 })}
                   required
                   minLength={2}
-                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                  className="h-11 bg-muted/40 px-3"
                 />
-              </label>
-              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              </Label>
+              <Label className="grid gap-2 text-sm font-semibold text-foreground">
                 Email
-                <input
+                <Input
                   {...registerProfileField('email', { required: true })}
                   type="email"
                   required
-                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                  className="h-11 bg-muted/40 px-3"
                 />
-              </label>
+              </Label>
             </div>
-            <button
+            <Button
               type="submit"
               disabled={isSavingProfile}
-              className="mt-5 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="mt-5 px-4 py-3 text-sm font-semibold"
             >
               {isSavingProfile ? 'Saving...' : 'Save profile'}
-            </button>
+            </Button>
           </form>
 
-          <form onSubmit={handlePasswordSubmit(submitPassword)} className="rounded border border-slate-200 bg-white p-5">
-            <h2 className="text-xl font-semibold text-slate-950">Change password</h2>
+          <form onSubmit={handlePasswordSubmit(submitPassword)} className="rounded-lg border border-border bg-card p-5">
+            <h2 className="text-xl font-semibold text-foreground">Change password</h2>
             <div className="mt-5 grid gap-4">
-              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              <Label className="grid gap-2 text-sm font-semibold text-foreground">
                 Current password
-                <input
+                <Input
                   {...registerPasswordField('currentPassword', { required: true })}
                   type="password"
                   required
-                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                  className="h-11 bg-muted/40 px-3"
                 />
-              </label>
+              </Label>
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                <Label className="grid gap-2 text-sm font-semibold text-foreground">
                   New password
-                  <input
+                  <Input
                     {...registerPasswordField('newPassword', { required: true, minLength: 8 })}
                     type="password"
                     required
                     minLength={8}
-                    className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                    className="h-11 bg-muted/40 px-3"
                   />
-                </label>
-                <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                </Label>
+                <Label className="grid gap-2 text-sm font-semibold text-foreground">
                   Confirm password
-                  <input
+                  <Input
                     {...registerPasswordField('confirmPassword', { required: true, minLength: 8 })}
                     type="password"
                     required
                     minLength={8}
-                    className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                    className="h-11 bg-muted/40 px-3"
                   />
-                </label>
+                </Label>
               </div>
             </div>
-            <button
+            <Button
               type="submit"
+              variant="outline"
               disabled={isSavingPassword}
-              className="mt-5 rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="mt-5 px-4 py-3 text-sm font-semibold"
             >
               {isSavingPassword ? 'Changing...' : 'Change password'}
-            </button>
+            </Button>
           </form>
 
-          <section className="rounded border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-border bg-card p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-slate-950">Organizer access</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                <h2 className="text-xl font-semibold text-foreground">Organizer access</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                   Manage your organizer application and event publishing access.
                 </p>
               </div>
-              <span className="w-fit rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              <span className="w-fit rounded bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                 {formatOrganizerStatus(organizerStatus)}
               </span>
             </div>
@@ -277,12 +283,12 @@ export function SettingsPage() {
               </p>
             )}
             {organizerStatus === 'suspended' && (
-              <p className="mt-5 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+              <p className="mt-5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
                 Organizer access is suspended. Contact support before applying again.
               </p>
             )}
             {user?.organizerProfile?.reviewNote && (
-              <p className="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                 {user.organizerProfile.reviewNote}
               </p>
             )}
@@ -290,7 +296,7 @@ export function SettingsPage() {
             {user?.role !== 'admin' && (
               <Link
                 to={organizerLink.to}
-                className="mt-5 inline-flex w-fit items-center gap-2 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                className={cn(buttonVariants(), 'mt-5 w-fit px-4 py-3 text-sm font-semibold')}
               >
                 <Users size={17} /> {organizerLink.label}
               </Link>
@@ -304,9 +310,9 @@ export function SettingsPage() {
 
 function SettingsRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded border border-slate-200 bg-slate-50 px-3 py-2">
-      <span className="font-medium text-slate-500">{label}</span>
-      <span className="truncate text-right font-semibold text-slate-950">{value}</span>
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/40 px-3 py-2">
+      <span className="font-medium text-muted-foreground">{label}</span>
+      <span className="truncate text-right font-semibold text-foreground">{value}</span>
     </div>
   )
 }

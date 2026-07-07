@@ -3,6 +3,8 @@ import toast from 'react-hot-toast'
 import { Ban, Download, Printer, Ticket } from 'lucide-react'
 import { EmptyState, LoadingPanel, SectionTitle } from '@/components/shared'
 import { EventMeta, EventPoster } from '@/components/events'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { normalizeEvent } from '@/lib/events'
 import api, { getApiErrorMessage } from '@/services/api'
 
@@ -144,55 +146,58 @@ export function BookingsPage() {
           const seatNumbers = booking.seats.map((seat) => seat.number)
           const canUseTicket = booking.status === 'confirmed' && Boolean(booking.qrCode?.dataUrl)
           return (
-            <article key={booking._id || booking.id} className="grid gap-4 rounded border border-slate-200 bg-white p-4 md:grid-cols-[160px_1fr_auto]">
-              <EventPoster event={event} className="h-36 w-full rounded md:h-full" />
+            <article key={booking._id || booking.id} className="grid gap-4 rounded-lg border border-border bg-card p-4 md:grid-cols-[160px_1fr_auto]">
+              <EventPoster event={event} className="h-36 w-full rounded-lg md:h-full" />
               <div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{booking.status}</span>
-                  <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{booking.bookingCode}</span>
+                  <Badge variant="secondary" className="h-auto bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-700">{booking.status}</Badge>
+                  <Badge variant="secondary" className="h-auto px-2 py-1 text-xs font-semibold">{booking.bookingCode}</Badge>
                 </div>
                 <h2 className="mt-3 text-xl font-semibold">{event?.title || 'Event unavailable'}</h2>
-                {event ? <EventMeta event={event} /> : <p className="mt-3 text-sm font-semibold text-slate-500">Event details are no longer available.</p>}
-                <p className="mt-3 text-sm font-semibold text-slate-600">Seats: {seatNumbers.join(', ')}</p>
+                {event ? <EventMeta event={event} /> : <p className="mt-3 text-sm font-semibold text-muted-foreground">Event details are no longer available.</p>}
+                <p className="mt-3 text-sm font-semibold text-muted-foreground">Seats: {seatNumbers.join(', ')}</p>
                 {booking.amount && (
-                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
                     Total: {booking.amount.currency} {booking.amount.total.toLocaleString('en-IN')}
                   </p>
                 )}
               </div>
               <div className="grid justify-items-start gap-3 md:justify-items-end">
                 {booking.qrCode?.dataUrl ? (
-                  <img src={booking.qrCode.dataUrl} alt={`${booking.bookingCode} QR code`} className="h-28 w-28 rounded ring-1 ring-slate-200" />
+                  <img src={booking.qrCode.dataUrl} alt={`${booking.bookingCode} QR code`} className="h-28 w-28 rounded-lg ring-1 ring-border" />
                 ) : (
-                  <div className="grid h-28 w-28 place-items-center rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-center text-xs font-semibold text-slate-500">
+                  <div className="grid h-28 w-28 place-items-center rounded-lg border border-dashed border-border bg-muted/40 p-3 text-center text-xs font-semibold text-muted-foreground">
                     QR unavailable
                   </div>
                 )}
                 <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     disabled={!canUseTicket}
                     onClick={() => downloadQr(booking)}
-                    className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                    className="px-3 py-2 text-sm font-semibold"
                   >
                     <Download size={15} /> QR
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
                     disabled={!canUseTicket}
                     onClick={() => printBooking(booking)}
-                    className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                    className="px-3 py-2 text-sm font-semibold"
                   >
                     <Printer size={15} /> Print
-                  </button>
+                  </Button>
                   {booking.status === 'confirmed' && (
-                    <button
+                    <Button
                       type="button"
+                      variant="destructive"
                       onClick={() => setCancelTarget(booking)}
-                      className="inline-flex items-center gap-2 rounded border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700"
+                      className="px-3 py-2 text-sm font-semibold"
                     >
                       <Ban size={15} /> Cancel
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -201,28 +206,30 @@ export function BookingsPage() {
         })}
       </div>
       {cancelTarget && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl">
-            <h2 className="text-xl font-semibold text-slate-950">Cancel booking?</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              This will cancel booking <span className="font-semibold text-slate-700">{cancelTarget.bookingCode}</span>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-2xl">
+            <h2 className="text-xl font-semibold text-foreground">Cancel booking?</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              This will cancel booking <span className="font-semibold text-foreground">{cancelTarget.bookingCode}</span>
               and release the selected seats if the event has not started.
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-3">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setCancelTarget(null)}
-                className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
+                className="px-4 py-3 text-sm font-semibold"
               >
                 Keep booking
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={cancelBooking}
-                className="rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+                className="px-4 py-3 text-sm font-semibold"
               >
                 Cancel booking
-              </button>
+              </Button>
             </div>
           </div>
         </div>

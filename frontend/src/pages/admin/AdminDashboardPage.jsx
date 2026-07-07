@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { BarChart3, CheckCircle2, ListChecks, Mail, Ticket, Users } from 'lucide-react'
 import { SectionTitle, Stat } from '@/components/shared'
+import { Badge } from '@/components/ui/badge'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { formatINR, formatOrganizerStatus } from '@/lib/formatters'
+import { cn } from '@/lib/utils'
 import api, { getApiErrorMessage } from '@/services/api'
 
 export function AdminDashboardPage() {
@@ -70,7 +73,7 @@ export function AdminDashboardPage() {
     return (
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <SectionTitle kicker="Admin" title="Dashboard" />
-        <div className="mt-6 rounded border border-rose-200 bg-white p-5 text-rose-700">
+        <div className="mt-6 rounded-lg border border-destructive/30 bg-card p-5 text-destructive">
           <p className="font-semibold">Admin dashboard unavailable</p>
           <p className="mt-2 text-sm">{loadError}</p>
         </div>
@@ -83,14 +86,15 @@ export function AdminDashboardPage() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionTitle kicker="Admin" title="Dashboard" />
         <div className="flex flex-wrap gap-2">
-          <Link to="/admin/reviews" className="inline-flex w-fit items-center gap-2 rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+          <Link to="/admin/reviews" className={cn(buttonVariants({ variant: 'outline' }), 'w-fit px-4 py-3 text-sm font-semibold')}>
             <ListChecks size={18} /> Review events
           </Link>
-          <Link to="/admin/events" className="inline-flex w-fit items-center gap-2 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
+          <Link to="/admin/events" className={cn(buttonVariants(), 'w-fit px-4 py-3 text-sm font-semibold')}>
             <ListChecks size={18} /> Manage events
           </Link>
         </div>
       </div>
+
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
         <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : '-'} icon={BarChart3} />
         <Stat label="Bookings" value={stats ? stats.bookings.toLocaleString('en-IN') : '-'} icon={Ticket} />
@@ -100,54 +104,57 @@ export function AdminDashboardPage() {
         <Stat label="Organizer requests" value={stats ? (stats.organizerRequests?.pending || 0).toLocaleString('en-IN') : '-'} icon={Users} />
         <Stat label="Event reviews" value={stats ? (stats.eventReviews?.pending || 0).toLocaleString('en-IN') : '-'} icon={ListChecks} />
       </div>
-      {isLoading && <p className="mt-4 text-sm font-semibold text-slate-500">Loading dashboard analytics...</p>}
+
+      {isLoading && <p className="mt-4 text-sm font-semibold text-muted-foreground">Loading dashboard analytics...</p>}
+
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-        <div className="rounded border border-slate-200 bg-white p-5">
+        <section className="rounded-lg border border-border bg-card p-5">
           <h2 className="text-xl font-semibold">Event performance</h2>
           <div className="mt-5 space-y-4">
             {!isLoading && performanceRows.length === 0 && (
-              <p className="text-sm font-semibold text-slate-500">No booking performance data yet.</p>
+              <p className="text-sm font-semibold text-muted-foreground">No booking performance data yet.</p>
             )}
             {performanceRows.map((event) => (
               <div key={event.id} className="grid gap-3 sm:grid-cols-[1fr_140px_110px] sm:items-center">
                 <div>
                   <p className="font-semibold">{event.title}</p>
-                  <p className="text-sm text-slate-500">{event.city} · {event.category}</p>
+                  <p className="text-sm text-muted-foreground">{event.city} / {event.category}</p>
                 </div>
-                <div className="h-2 rounded bg-slate-100">
+                <div className="h-2 rounded bg-muted">
                   <div className="h-2 rounded bg-gradient-to-r from-rose-600 to-orange-500" style={{ width: `${event.sold}%` }} />
                 </div>
-                <p className="text-sm font-semibold text-slate-700">{formatINR(event.revenue)}</p>
+                <p className="text-sm font-semibold text-foreground">{formatINR(event.revenue)}</p>
               </div>
             ))}
           </div>
-        </div>
+        </section>
+
         <div className="grid gap-5">
-          <div className="rounded border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-border bg-card p-5">
             <h2 className="text-xl font-semibold">Organizer requests</h2>
             <div className="mt-5 space-y-4">
               {!isLoading && organizerRequests.length === 0 && (
-                <p className="text-sm font-semibold text-slate-500">No pending organizer requests.</p>
+                <p className="text-sm font-semibold text-muted-foreground">No pending organizer requests.</p>
               )}
               {organizerRequests.map((request) => (
-                <div key={request._id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                <div key={request._id} className="rounded-lg border border-border bg-muted/40 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-950">
+                      <p className="truncate font-semibold text-foreground">
                         {request.organizerProfile?.organizationName || request.name}
                       </p>
-                      <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                      <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
                         {request.name} - {request.email}
                       </p>
                     </div>
-                    <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                    <Badge variant="secondary" className="h-auto px-2 py-1 text-xs font-semibold">
                       {formatOrganizerStatus(request.organizerProfile?.status)}
-                    </span>
+                    </Badge>
                   </div>
                   {request.organizerProfile?.message && (
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{request.organizerProfile.message}</p>
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{request.organizerProfile.message}</p>
                   )}
-                  <div className="mt-3 grid gap-1 text-xs font-semibold text-slate-500">
+                  <div className="mt-3 grid gap-1 text-xs font-semibold text-muted-foreground">
                     {request.organizerProfile?.contactEmail && <span>{request.organizerProfile.contactEmail}</span>}
                     {request.organizerProfile?.city && <span>{request.organizerProfile.city}</span>}
                     {request.organizerProfile?.website && <span>{request.organizerProfile.website}</span>}
@@ -156,69 +163,74 @@ export function AdminDashboardPage() {
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => reviewOrganizerRequest(request._id, 'approved')}
-                      className="rounded border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700"
+                      className="border-emerald-500/30 px-3 py-2 text-xs font-semibold text-emerald-700"
                     >
                       Approve
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="destructive"
                       onClick={() => reviewOrganizerRequest(request._id, 'rejected')}
-                      className="rounded border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700"
+                      className="px-3 py-2 text-xs font-semibold"
                     >
                       Reject
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-          <div className="rounded border border-slate-200 bg-white p-5">
+          </section>
+
+          <section className="rounded-lg border border-border bg-card p-5">
             <h2 className="text-xl font-semibold">Support queue</h2>
-          <div className="mt-5 space-y-4">
-            {!isLoading && supportMessages.length === 0 && (
-              <p className="text-sm font-semibold text-slate-500">No support messages yet.</p>
-            )}
-            {supportMessages.map((message) => (
-              <div key={message._id} className="rounded border border-slate-200 bg-slate-50 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-950">{message.subject}</p>
-                    <p className="mt-1 truncate text-xs font-medium text-slate-500">
-                      {message.name} · {message.email}
-                    </p>
+            <div className="mt-5 space-y-4">
+              {!isLoading && supportMessages.length === 0 && (
+                <p className="text-sm font-semibold text-muted-foreground">No support messages yet.</p>
+              )}
+              {supportMessages.map((message) => (
+                <div key={message._id} className="rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">{message.subject}</p>
+                      <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
+                        {message.name} / {message.email}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="h-auto px-2 py-1 text-xs font-semibold">
+                      {message.status.replace('_', ' ')}
+                    </Badge>
                   </div>
-                  <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
-                    {message.status.replace('_', ' ')}
-                  </span>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{message.message}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {message.status === 'new' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => updateSupportStatus(message._id, 'in_progress')}
+                        className="px-3 py-2 text-xs font-semibold"
+                      >
+                        Mark in progress
+                      </Button>
+                    )}
+                    {message.status !== 'resolved' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => updateSupportStatus(message._id, 'resolved')}
+                        className="border-emerald-500/30 px-3 py-2 text-xs font-semibold text-emerald-700"
+                      >
+                        Resolve
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{message.message}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {message.status === 'new' && (
-                    <button
-                      type="button"
-                      onClick={() => updateSupportStatus(message._id, 'in_progress')}
-                      className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                    >
-                      Mark in progress
-                    </button>
-                  )}
-                  {message.status !== 'resolved' && (
-                    <button
-                      type="button"
-                      onClick={() => updateSupportStatus(message._id, 'resolved')}
-                      className="rounded border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700"
-                    >
-                      Resolve
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     </main>

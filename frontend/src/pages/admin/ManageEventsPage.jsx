@@ -6,7 +6,10 @@ import { format } from 'date-fns'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { SectionTitle } from '@/components/shared'
 import { EventPoster } from '@/components/events'
 import { AdminField } from '@/components/forms'
@@ -246,7 +249,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
     return (
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <SectionTitle kicker={pageKicker} title={pageTitle} />
-        <div className="mt-6 rounded border border-rose-200 bg-white p-5 text-rose-700">
+        <div className="mt-6 rounded-lg border border-destructive/30 bg-card p-5 text-destructive">
           <p className="font-semibold">Event management unavailable</p>
           <p className="mt-2 text-sm">{loadError}</p>
         </div>
@@ -259,7 +262,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionTitle kicker={pageKicker} title={pageTitle} />
         {!isReviewQueue && (
-          <button
+          <Button
             type="button"
             onClick={() => {
               if (showForm && !editingEvent) {
@@ -268,29 +271,29 @@ export function ManageEventsPage({ scope = 'admin' }) {
                 openCreateForm()
               }
             }}
-            className="inline-flex w-fit items-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+            className="w-fit px-4 py-3 text-sm font-semibold"
           >
             <Plus size={18} /> {showForm && !editingEvent ? 'Close form' : isOrganizer ? 'Create draft' : 'Create event'}
-          </button>
+          </Button>
         )}
       </div>
 
       {isOrganizer && (
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {organizerSummary.map((section) => (
-            <div key={section.key} className="rounded border border-slate-200 bg-white p-4">
-              <p className="text-sm font-semibold text-slate-500">{section.title}</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-950">{section.count}</p>
+            <div key={section.key} className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-semibold text-muted-foreground">{section.title}</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">{section.count}</p>
             </div>
           ))}
         </div>
       )}
 
       {showForm && !isReviewQueue && (
-        <form onSubmit={handleEventSubmit(submitEvent)} className="mb-6 rounded border border-slate-200 bg-white p-5">
+        <form onSubmit={handleEventSubmit(submitEvent)} className="mb-6 rounded-lg border border-border bg-card p-5">
           <div className="mb-4">
-            <h2 className="text-xl font-semibold text-slate-950">{editingEvent ? 'Edit event' : 'Create event'}</h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <h2 className="text-xl font-semibold text-foreground">{editingEvent ? 'Edit event' : 'Create event'}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               {editingEvent
                 ? 'Update event details and upload a new poster if needed.'
                 : isOrganizer
@@ -300,96 +303,97 @@ export function ManageEventsPage({ scope = 'admin' }) {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <AdminField label="Title" registration={registerEventField('title', { required: true })} required />
-            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            <Label className="grid gap-2 text-sm font-semibold text-foreground">
               Category
               <select
                 {...registerEventField('category', { required: true })}
                 required
-                className="h-11 rounded border border-slate-200 bg-slate-50 px-3 outline-none focus:border-rose-500"
+                className="h-11 rounded-lg border border-input bg-muted/40 px-3 text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {['Music', 'Comedy', 'Business', 'Sports', 'Food', 'Arts', 'Technology', 'Other'].map((category) => (
                   <option key={category}>{category}</option>
                 ))}
               </select>
-            </label>
+            </Label>
             <AdminField label="Venue name" registration={registerEventField('venueName', { required: true })} required />
             <AdminField label="City" registration={registerEventField('city', { required: true })} required />
             <AdminField label="Address" registration={registerEventField('address', { required: true })} required />
             <AdminField label="Start date" type="datetime-local" registration={registerEventField('startsAt', { required: true })} required />
             <AdminField label="Price from" type="number" registration={registerEventField('priceFrom', { required: true, min: 0 })} required min="0" />
             <AdminField label="Total seats" type="number" registration={registerEventField('totalSeats', { required: true, min: 1 })} required min="1" />
-            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            <Label className="grid gap-2 text-sm font-semibold text-foreground">
               Poster image
-              <input
+              <Input
                 {...registerEventField('posterFile')}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                className="h-11 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-rose-500"
+                className="h-11 bg-muted/40 px-3 py-2 text-sm"
               />
-            </label>
+            </Label>
           </div>
-          <label className="mt-4 grid gap-2 text-sm font-semibold text-slate-700">
+          <Label className="mt-4 grid gap-2 text-sm font-semibold text-foreground">
             Description
-            <textarea
+            <Textarea
               {...registerEventField('description', { required: true, minLength: 20 })}
               required
               minLength={20}
               rows={4}
-              className="rounded border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-rose-500"
+              className="bg-muted/40 px-3 py-2"
             />
-          </label>
+          </Label>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button
+            <Button
               type="submit"
               disabled={isSubmitting}
-              className="rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="px-4 py-3 text-sm font-semibold"
             >
               {isSubmitting ? 'Saving...' : editingEvent ? 'Update event' : 'Save event'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={closeEventForm}
-              className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
+              className="px-4 py-3 text-sm font-semibold"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
 
-      <div className="overflow-hidden rounded border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
           <Table className="min-w-[760px] text-left text-sm">
-            <TableHeader className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+            <TableHeader className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="px-4 py-3 text-slate-500">Event</TableHead>
-                <TableHead className="px-4 py-3 text-slate-500">Date</TableHead>
-                <TableHead className="px-4 py-3 text-slate-500">City</TableHead>
-                <TableHead className="px-4 py-3 text-slate-500">Status</TableHead>
-                <TableHead className="px-4 py-3 text-slate-500">Sold</TableHead>
-                <TableHead className="px-4 py-3 text-slate-500">Action</TableHead>
+                <TableHead className="px-4 py-3 text-muted-foreground">Event</TableHead>
+                <TableHead className="px-4 py-3 text-muted-foreground">Date</TableHead>
+                <TableHead className="px-4 py-3 text-muted-foreground">City</TableHead>
+                <TableHead className="px-4 py-3 text-muted-foreground">Status</TableHead>
+                <TableHead className="px-4 py-3 text-muted-foreground">Sold</TableHead>
+                <TableHead className="px-4 py-3 text-muted-foreground">Action</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="divide-y divide-slate-200">
+            <TableBody className="divide-y divide-border">
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
+                  <TableCell colSpan="6" className="px-4 py-8 text-center font-semibold text-muted-foreground">
                     Loading events...
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
+                  <TableCell colSpan="6" className="px-4 py-8 text-center font-semibold text-muted-foreground">
                     {isOrganizer ? 'No organizer events found. Create your first draft.' : isReviewQueue ? 'No events are waiting for review.' : 'No events found. Create your first event.'}
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && displayRows.map((event) => event.type === 'section' ? (
-                <TableRow key={event.key} className="bg-slate-50 hover:bg-slate-50">
+                <TableRow key={event.key} className="bg-muted/40 hover:bg-muted/40">
                   <TableCell colSpan="6" className="px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
-                      <p className="text-sm font-semibold text-slate-950">{event.title}</p>
-                      <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">{event.count}</span>
+                      <p className="text-sm font-semibold text-foreground">{event.title}</p>
+                      <Badge variant="secondary" className="h-auto px-2 py-1 text-xs font-semibold">{event.count}</Badge>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -400,14 +404,14 @@ export function ManageEventsPage({ scope = 'admin' }) {
                       <EventPoster event={event} className="h-12 w-16 rounded" />
                       <div>
                         <p className="font-semibold">{event.title}</p>
-                        <p className="text-xs text-slate-500">{event.category}</p>
+                        <p className="text-xs text-muted-foreground">{event.category}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="px-4 py-4 font-semibold">{format(event.date, 'dd MMM yyyy')}</TableCell>
                   <TableCell className="px-4 py-4">{event.city}</TableCell>
                   <TableCell className="px-4 py-4">
-                    <Badge variant="secondary" className="h-auto rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                    <Badge variant="secondary" className="h-auto px-2 py-1 text-xs font-semibold">
                       {formatEventStatus(event.status)}
                     </Badge>
                     {isOrganizer && event.status === 'approved' && (
@@ -424,7 +428,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => openEditForm(event.raw)}
-                          className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
+                          className="px-3 py-2 font-medium"
                         >
                           <Edit3 size={15} /> Edit
                         </Button>
@@ -434,7 +438,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => submitOrganizerDraft(event.id)}
-                          className="rounded border border-slate-300 px-3 py-2 font-medium"
+                          className="px-3 py-2 font-medium"
                         >
                           Submit
                         </Button>
@@ -444,7 +448,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => publishOrganizerEvent(event.id)}
-                          className="rounded border border-emerald-200 px-3 py-2 font-medium text-emerald-700"
+                          className="border-emerald-500/30 px-3 py-2 font-medium text-emerald-700"
                         >
                           Publish
                         </Button>
@@ -454,7 +458,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => updateEventStatus(event.id, 'publish')}
-                          className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
+                          className="px-3 py-2 font-medium"
                         >
                           <Edit3 size={15} /> Publish
                         </Button>
@@ -464,7 +468,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => reviewEvent(event.id, 'under_review')}
-                          className="rounded border border-slate-300 px-3 py-2 font-medium"
+                          className="px-3 py-2 font-medium"
                         >
                           Review
                         </Button>
@@ -475,7 +479,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                             variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'approved')}
-                            className="rounded border border-emerald-200 px-3 py-2 font-medium text-emerald-700"
+                            className="border-emerald-500/30 px-3 py-2 font-medium text-emerald-700"
                           >
                             Approve
                           </Button>
@@ -483,15 +487,16 @@ export function ManageEventsPage({ scope = 'admin' }) {
                             variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'changes_requested')}
-                            className="rounded border border-amber-200 px-3 py-2 font-medium text-amber-700"
+                            className="border-amber-500/30 px-3 py-2 font-medium text-amber-700"
                           >
                             Changes
                           </Button>
                           <Button
                             variant="outline"
                             type="button"
+                            variant="destructive"
                             onClick={() => reviewEvent(event.id, 'rejected')}
-                            className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
+                            className="px-3 py-2 font-medium"
                           >
                             Reject
                           </Button>
@@ -502,7 +507,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => updateEventStatus(event.id, 'cancel')}
-                          className="rounded border border-slate-300 px-3 py-2 font-medium"
+                          className="px-3 py-2 font-medium"
                         >
                           Cancel
                         </Button>
@@ -511,8 +516,9 @@ export function ManageEventsPage({ scope = 'admin' }) {
                         <Button
                           variant="outline"
                           type="button"
+                          variant="destructive"
                           onClick={() => setDeleteTarget(event.raw)}
-                          className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
+                          className="px-3 py-2 font-medium"
                         >
                           Delete
                         </Button>
@@ -532,22 +538,23 @@ export function ManageEventsPage({ scope = 'admin' }) {
           }
         }}
       >
-        <AlertDialogContent className="max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl ring-0">
+        <AlertDialogContent className="max-w-md rounded-lg p-5 shadow-2xl">
           <AlertDialogHeader className="place-items-start text-left">
-            <AlertDialogTitle className="text-xl font-semibold text-slate-950">Delete event?</AlertDialogTitle>
-            <AlertDialogDescription className="mt-2 text-sm leading-6 text-slate-500">
-              This will permanently remove <span className="font-semibold text-slate-700">{deleteTarget?.title}</span>.
+            <AlertDialogTitle className="text-xl font-semibold text-foreground">Delete event?</AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-6 text-muted-foreground">
+              This will permanently remove <span className="font-semibold text-foreground">{deleteTarget?.title}</span>.
               Existing booking references may no longer show event details.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="-mx-5 -mb-5 mt-1 flex flex-wrap justify-end gap-3 rounded-b border-t border-slate-200 bg-white p-5">
-            <AlertDialogCancel className="h-11 rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+          <AlertDialogFooter className="-mx-5 -mb-5 mt-1 flex flex-wrap justify-end gap-3 rounded-b border-t border-border bg-muted/40 p-5">
+            <AlertDialogCancel className="h-11 px-4 py-3 text-sm font-semibold">
               Keep event
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
               onClick={deleteEvent}
-              className="h-11 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+              variant="destructive"
+              className="h-11 px-4 py-3 text-sm font-semibold"
             >
               Delete event
             </AlertDialogAction>

@@ -9,12 +9,12 @@ export function EventPoster({ event, className = '' }) {
   }
 
   return (
-    <div className={`${className} grid place-items-center bg-slate-900 p-4 text-center text-white`}>
+    <div className={`${className} grid place-items-center bg-foreground p-4 text-center text-background`}>
       <div>
-        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded bg-white text-slate-950">
+        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-lg bg-background text-foreground">
           <Ticket size={22} />
         </div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">{category}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-background/60">{category}</p>
         <p className="mt-1 line-clamp-2 text-sm font-semibold">{title}</p>
       </div>
     </div>

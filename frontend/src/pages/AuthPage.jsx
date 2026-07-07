@@ -39,15 +39,15 @@ export function ConnectedAuthPage({ mode }) {
 
   return (
     <main className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-7xl place-items-center px-4 py-8 sm:px-6 lg:px-8">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded border border-slate-200 bg-white md:grid-cols-[1fr_0.9fr]">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-border bg-card md:grid-cols-[1fr_0.9fr]">
         <AuthVisual />
         <form onSubmit={handleAuthSubmit(submitAuth)} className="p-6 sm:p-8">
           <div className="mb-6">
-            <span className="grid h-11 w-11 place-items-center rounded bg-rose-600 text-white">
+            <span className="grid h-11 w-11 place-items-center rounded-lg bg-primary text-primary-foreground">
               <User size={22} />
             </span>
             <h1 className="mt-4 text-3xl font-semibold">{isRegister ? 'Create account' : 'Welcome back'}</h1>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-muted-foreground">
               {isRegister ? 'Start booking and managing tickets.' : 'Continue to your bookings and events.'}
             </p>
           </div>
@@ -73,13 +73,13 @@ export function ConnectedAuthPage({ mode }) {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="mt-6 h-12 w-full rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="mt-6 h-12 w-full px-4 py-3 text-sm font-semibold"
           >
             {isSubmitting ? 'Please wait...' : isRegister ? 'Register' : 'Login'}
           </Button>
-          <p className="mt-5 text-center text-sm text-slate-500">
+          <p className="mt-5 text-center text-sm text-muted-foreground">
             {isRegister ? 'Already registered?' : 'New to Ticketo?'}{' '}
-            <Link className="font-semibold text-rose-600" to={isRegister ? '/login' : '/register'}>
+            <Link className="font-semibold text-primary hover:underline" to={isRegister ? '/login' : '/register'}>
               {isRegister ? 'Login' : 'Create account'}
             </Link>
           </p>
@@ -91,12 +91,12 @@ export function ConnectedAuthPage({ mode }) {
 
 function AuthVisual() {
   return (
-    <div className="hidden bg-slate-950 p-8 text-white md:flex md:flex-col md:justify-between">
-      <div className="grid h-12 w-12 place-items-center rounded bg-white text-slate-950">
+    <div className="hidden bg-foreground p-8 text-background md:flex md:flex-col md:justify-between">
+      <div className="grid h-12 w-12 place-items-center rounded-lg bg-background text-foreground">
         <Ticket size={24} />
       </div>
       <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-white/55">Ticketo</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-background/55">Ticketo</p>
         <h2 className="mt-3 text-3xl font-semibold leading-tight">Manage access to bookings, events, and tickets.</h2>
       </div>
     </div>

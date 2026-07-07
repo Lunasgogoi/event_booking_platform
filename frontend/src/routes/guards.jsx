@@ -4,7 +4,7 @@ import { useAuth } from '@/context/useAuth'
 function AccessCheck() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <p className="text-sm font-semibold text-slate-500">Checking access...</p>
+      <p className="text-sm font-semibold text-muted-foreground">Checking access...</p>
     </main>
   )
 }

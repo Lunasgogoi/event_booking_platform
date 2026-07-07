@@ -4,16 +4,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 export function EmptyState({ icon: Icon, title, message, actionLabel, actionTo, onAction }) {
-  const actionClass = 'mt-5 h-11 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+  const actionClass = 'mt-5 h-11 px-4 py-3 text-sm font-semibold'
 
   return (
-    <Card className="rounded border border-dashed border-slate-300 bg-white py-0 text-center ring-0">
+    <Card className="rounded-lg border-dashed py-0 text-center">
       <CardContent className="p-8">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded bg-slate-100 text-slate-700">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-muted text-muted-foreground">
           <Icon size={22} />
         </span>
-        <h2 className="mt-4 text-xl font-semibold text-slate-950">{title}</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{message}</p>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">{title}</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{message}</p>
         {actionTo && (
           <Link to={actionTo} className={cn(buttonVariants(), actionClass)}>
             {actionLabel}
