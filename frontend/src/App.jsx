@@ -29,14 +29,38 @@ import {
   Ticket,
   User,
   Users,
-  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useAuth } from './context/useAuth'
@@ -408,110 +432,61 @@ function ThemeToggle({ isDark, onToggleTheme }) {
 }
 
 function ProfileMenu({ user, onLogout }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const menuRef = useRef(null)
   const avatarUrl = getAvatarUrl(user)
   const initial = getUserInitial(user)
   const organizerLink = getOrganizerLink(user)
 
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined
-    }
-
-    function handlePointerDown(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setIsOpen(false)
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isOpen])
-
-  function closeMenu() {
-    setIsOpen(false)
-  }
-
   return (
-    <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen((value) => !value)}
+    <DropdownMenu>
+      <DropdownMenuTrigger
         className="inline-flex h-10 items-center gap-2 rounded border border-slate-300 bg-white px-1.5 pr-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
         aria-haspopup="menu"
-        aria-expanded={isOpen}
         aria-label="Open profile menu"
       >
-        <span className="grid h-8 w-8 overflow-hidden rounded-full bg-slate-950 text-white">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="grid h-full w-full place-items-center text-sm font-semibold">{initial}</span>
-          )}
-        </span>
-        <ChevronDown size={16} className={`transition ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div
-          role="menu"
-          className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded border border-slate-200 bg-white shadow-2xl"
-        >
-          <div className="border-b border-slate-200 px-4 py-3">
-            <p className="truncate text-sm font-semibold text-slate-950">{user?.name || 'Ticketo user'}</p>
-            <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{user?.email}</p>
-          </div>
-          <div className="p-2">
-            <ProfileMenuLink to="/settings" icon={Settings} label="Settings" onClick={closeMenu} />
-            <ProfileMenuLink to="/about" icon={Info} label="About us" onClick={closeMenu} />
-            {user?.role !== 'admin' && (
-              <ProfileMenuLink to={organizerLink.to} icon={Users} label={organizerLink.label} onClick={closeMenu} />
-            )}
-            <ProfileMenuLink to="/contact" icon={Mail} label="Contact us" onClick={closeMenu} />
-          </div>
-          <div className="border-t border-slate-200 p-2">
-            <button
-              type="button"
-              onClick={() => {
-                closeMenu()
-                onLogout()
-              }}
-              className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
-              role="menuitem"
-            >
-              <LogOut size={17} />
-              Logout
-            </button>
-          </div>
+        <Avatar className="h-8 w-8 bg-slate-950 text-white">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+          <AvatarFallback className="bg-slate-950 text-sm font-semibold text-white">{initial}</AvatarFallback>
+        </Avatar>
+        <ChevronDown size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={8} className="w-72 overflow-hidden rounded border border-slate-200 bg-white p-0 shadow-2xl">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <p className="truncate text-sm font-semibold text-slate-950">{user?.name || 'Ticketo user'}</p>
+          <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{user?.email}</p>
         </div>
-      )}
-    </div>
-  )
-}
-
-function ProfileMenuLink({ to, icon: Icon, label, onClick }) {
-  return (
-    <Link
-      to={to}
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-      role="menuitem"
-    >
-      <Icon size={17} className="text-slate-400" />
-      {label}
-    </Link>
+        <div className="p-2">
+          <DropdownMenuItem render={<Link to="/settings" />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <Settings size={17} className="text-slate-400" />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link to="/about" />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <Info size={17} className="text-slate-400" />
+            About us
+          </DropdownMenuItem>
+          {user?.role !== 'admin' && (
+            <DropdownMenuItem render={<Link to={organizerLink.to} />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+              <Users size={17} className="text-slate-400" />
+              {organizerLink.label}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem render={<Link to="/contact" />} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <Mail size={17} className="text-slate-400" />
+            Contact us
+          </DropdownMenuItem>
+        </div>
+        <DropdownMenuSeparator className="m-0 bg-slate-200" />
+        <div className="p-2">
+          <DropdownMenuItem
+            onClick={onLogout}
+            variant="destructive"
+            className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
+          >
+            <LogOut size={17} />
+            Logout
+          </DropdownMenuItem>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -588,94 +563,96 @@ function Shell({ children, theme, onToggleTheme }) {
             )}
           </div>
 
-          <button
-            type="button"
-            className="grid h-10 w-10 place-items-center rounded border border-slate-300 md:hidden"
-            onClick={() => setOpen((value) => !value)}
-            aria-label="Toggle navigation"
-          >
-            {open ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-
-        {open && (
-          <div className="border-t border-slate-200 bg-white px-4 py-3 md:hidden">
-            <div className="grid gap-2">
-              {links.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setOpen(false)}
-                  className="rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger
+              className="grid h-10 w-10 place-items-center rounded border border-slate-300 md:hidden"
+              aria-label="Toggle navigation"
+            >
+              <Menu size={20} />
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[min(22rem,90vw)] border-slate-200 bg-white p-0 md:hidden">
+              <SheetHeader className="border-b border-slate-200 px-4 py-4 text-left">
+                <SheetTitle className="flex items-center gap-2 text-lg font-semibold tracking-normal">
+                  <span className="grid h-9 w-9 place-items-center rounded bg-rose-600 text-white">
+                    <Ticket size={20} />
+                  </span>
+                  Ticketo
+                </SheetTitle>
+              </SheetHeader>
+              <div className="grid gap-2 px-4 py-3">
+                {links.map((link) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setOpen(false)}
+                    className="rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    {link.label}
+                  </NavLink>
+                ))}
+                <button
+                  type="button"
+                  onClick={onToggleTheme}
+                  className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
                 >
-                  {link.label}
-                </NavLink>
-              ))}
-              <button
-                type="button"
-                onClick={onToggleTheme}
-                className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
-              >
-                {isDark ? <Sun size={17} /> : <Moon size={17} />}
-                {isDark ? 'Light mode' : 'Dark mode'}
-              </button>
-              {isAuthenticated ? (
-                <>
-                  <div className="flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3">
-                    <span className="grid h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-950 text-white">
-                      {getAvatarUrl(user) ? (
-                        <img src={getAvatarUrl(user)} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="grid h-full w-full place-items-center text-sm font-semibold">
+                  {isDark ? <Sun size={17} /> : <Moon size={17} />}
+                  {isDark ? 'Light mode' : 'Dark mode'}
+                </button>
+                {isAuthenticated ? (
+                  <>
+                    <div className="flex items-center gap-3 rounded border border-slate-200 bg-slate-50 px-3 py-3">
+                      <Avatar className="h-10 w-10 shrink-0 bg-slate-950 text-white">
+                        {getAvatarUrl(user) && <AvatarImage src={getAvatarUrl(user)} alt="" />}
+                        <AvatarFallback className="bg-slate-950 text-sm font-semibold text-white">
                           {getUserInitial(user)}
-                        </span>
-                      )}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-slate-950">{user?.name}</span>
-                      <span className="block truncate text-xs font-medium text-slate-500">{user?.email}</span>
-                    </span>
-                  </div>
-                  <Link
-                    to="/settings"
-                    onClick={() => setOpen(false)}
-                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    <Settings size={17} /> Settings
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-slate-950">{user?.name}</span>
+                        <span className="block truncate text-xs font-medium text-slate-500">{user?.email}</span>
+                      </span>
+                    </div>
+                    <Link
+                      to="/settings"
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      <Settings size={17} /> Settings
+                    </Link>
+                    <Link
+                      to="/about"
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      <Info size={17} /> About us
+                    </Link>
+                    <Link
+                      to="/contact"
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      <Mail size={17} /> Contact us
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false)
+                        handleLogout()
+                      }}
+                      className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                    >
+                      <LogOut size={17} /> Logout
+                    </button>
+                  </>
+                ) : (
+                  <Link to="/login" onClick={() => setOpen(false)} className="rounded px-3 py-2 text-sm font-semibold">
+                    Login
                   </Link>
-                  <Link
-                    to="/about"
-                    onClick={() => setOpen(false)}
-                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    <Info size={17} /> About us
-                  </Link>
-                  <Link
-                    to="/contact"
-                    onClick={() => setOpen(false)}
-                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    <Mail size={17} /> Contact us
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false)
-                      handleLogout()
-                    }}
-                    className="inline-flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
-                  >
-                    <LogOut size={17} /> Logout
-                  </button>
-                </>
-              ) : (
-                <Link to="/login" onClick={() => setOpen(false)} className="rounded px-3 py-2 text-sm font-semibold">
-                  Login
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
       {children}
     </>
@@ -2838,33 +2815,36 @@ function ManageEventsPage({ scope = 'admin' }) {
           </table>
         </div>
       </div>
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl">
-            <h2 className="text-xl font-semibold text-slate-950">Delete event?</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              This will permanently remove <span className="font-semibold text-slate-700">{deleteTarget.title}</span>.
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setDeleteTarget(null)
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md rounded border border-slate-200 bg-white p-5 shadow-2xl ring-0">
+          <AlertDialogHeader className="place-items-start text-left">
+            <AlertDialogTitle className="text-xl font-semibold text-slate-950">Delete event?</AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-6 text-slate-500">
+              This will permanently remove <span className="font-semibold text-slate-700">{deleteTarget?.title}</span>.
               Existing booking references may no longer show event details.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
-              >
-                Keep event
-              </button>
-              <button
-                type="button"
-                onClick={deleteEvent}
-                className="rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
-              >
-                Delete event
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="-mx-5 -mb-5 mt-1 flex flex-wrap justify-end gap-3 rounded-b border-t border-slate-200 bg-white p-5">
+            <AlertDialogCancel className="h-11 rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+              Keep event
+            </AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={deleteEvent}
+              className="h-11 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+            >
+              Delete event
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }
