@@ -4,6 +4,7 @@ const ContactMessage = require('../models/ContactMessage')
 const Event = require('../models/Event')
 const User = require('../models/User')
 const ApiError = require('../utils/ApiError')
+const { sendEmail } = require('../services/emailService')
 
 function ensureObjectId(id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -26,6 +27,8 @@ async function getDashboardStats(req, res, next) {
       eventPerformance,
       recentBookings,
       newSupportMessages,
+      pendingOrganizerRequests,
+      pendingEventReviews,
     ] = await Promise.all([
       Booking.aggregate([
         { $match: { status: 'confirmed' } },
@@ -83,6 +86,8 @@ async function getDashboardStats(req, res, next) {
         .populate('user', 'name email')
         .populate('event', 'title'),
       ContactMessage.countDocuments({ status: 'new' }),
+      User.countDocuments({ 'organizerProfile.status': 'pending' }),
+      Event.countDocuments({ status: { $in: ['submitted', 'under_review'] } }),
     ])
 
     const counts = eventCounts.reduce(
@@ -114,6 +119,12 @@ async function getDashboardStats(req, res, next) {
         supportMessages: {
           new: newSupportMessages,
         },
+        organizerRequests: {
+          pending: pendingOrganizerRequests,
+        },
+        eventReviews: {
+          pending: pendingEventReviews,
+        },
       },
       eventPerformance: eventPerformance.map((item) => ({
         id: item._id,
@@ -134,6 +145,97 @@ async function getDashboardStats(req, res, next) {
         status: booking.status,
         createdAt: booking.createdAt,
       })),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function getOrganizerRequests(req, res, next) {
+  try {
+    const { status = 'pending', page = 1, limit = 20 } = req.query
+    const allowedStatuses = ['pending', 'approved', 'rejected', 'suspended']
+    const query = {}
+
+    if (allowedStatuses.includes(status)) {
+      query['organizerProfile.status'] = status
+    } else if (status === 'all') {
+      query['organizerProfile.status'] = { $in: allowedStatuses }
+    } else {
+      throw new ApiError(400, 'Invalid organizer request status')
+    }
+
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+
+    const [organizerRequests, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .sort({ 'organizerProfile.requestedAt': -1, createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .populate('organizerProfile.reviewedBy', 'name email'),
+      User.countDocuments(query),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Organizer requests fetched successfully',
+      organizerRequests,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize),
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function reviewOrganizerRequest(req, res, next) {
+  try {
+    const { userId } = req.params
+    const { status, reviewNote } = req.body
+    ensureObjectId(userId)
+
+    if (isSelf(req, userId)) {
+      throw new ApiError(400, 'You cannot review your own organizer access')
+    }
+
+    const user = await User.findById(userId)
+    if (!user) {
+      throw new ApiError(404, 'User not found')
+    }
+
+    const currentStatus = user.organizerProfile?.status || 'none'
+    if (currentStatus === 'none') {
+      throw new ApiError(400, 'User has not requested organizer access')
+    }
+
+    user.organizerProfile = {
+      ...user.organizerProfile,
+      status,
+      reviewedAt: new Date(),
+      reviewedBy: req.user._id,
+      reviewNote,
+    }
+    user.role = status === 'approved' ? 'organizer' : 'user'
+    await user.save({ validateBeforeSave: false })
+
+    const statusLabel = status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'suspended'
+    await sendEmail({
+      to: user.email,
+      subject: `Organizer access ${statusLabel}`,
+      text: `Hi ${user.name}, your organizer access request has been ${statusLabel}.${reviewNote ? ` Note: ${reviewNote}` : ''}`,
+      html: `<p>Hi ${user.name},</p><p>Your organizer access request has been <strong>${statusLabel}</strong>.</p>${reviewNote ? `<p>${reviewNote}</p>` : ''}`,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Organizer request reviewed successfully',
+      user,
     })
   } catch (error) {
     next(error)
@@ -298,7 +400,9 @@ async function updateUserStatus(req, res, next) {
 module.exports = {
   getContactMessages,
   getDashboardStats,
+  getOrganizerRequests,
   getUsers,
+  reviewOrganizerRequest,
   updateContactMessageStatus,
   updateUserRole,
   updateUserStatus,

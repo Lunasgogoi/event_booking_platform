@@ -170,6 +170,30 @@ test('admin event creation validates payload before controller work', async (t) 
   assert.equal(response.body.message, 'Validation failed')
 })
 
+test('regular users cannot create organizer draft events', async (t) => {
+  stubUsers(t)
+
+  const response = await request('POST', '/api/events/organizer', {
+    headers: authHeader(USER_ID),
+    body: {
+      title: 'Organizer Draft Event',
+      description: 'This payload is valid enough to reach role checks.',
+      category: 'Music',
+      venue: {
+        name: 'Test Venue',
+        address: '123 Test Street',
+        city: 'Mumbai',
+      },
+      startsAt: '2026-08-10T10:00:00.000Z',
+      priceFrom: 500,
+      totalSeats: 50,
+    },
+  })
+
+  assert.equal(response.status, 403)
+  assert.equal(response.body.success, false)
+})
+
 test('admin user role update validates payload before controller work', async (t) => {
   stubUsers(t)
 
@@ -177,6 +201,32 @@ test('admin user role update validates payload before controller work', async (t
     headers: authHeader(ADMIN_ID),
     body: {
       role: 'owner',
+    },
+  })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.body.success, false)
+  assert.equal(response.body.message, 'Validation failed')
+})
+
+test('organizer request requires authentication', async () => {
+  const response = await request('POST', '/api/auth/organizer-request', {
+    body: {
+      organizationName: 'Small Hall Collective',
+    },
+  })
+
+  assert.equal(response.status, 401)
+  assert.equal(response.body.success, false)
+})
+
+test('organizer request validates payload before controller work', async (t) => {
+  stubUsers(t)
+
+  const response = await request('POST', '/api/auth/organizer-request', {
+    headers: authHeader(USER_ID),
+    body: {
+      organizationName: 'A',
     },
   })
 

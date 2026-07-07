@@ -1,7 +1,7 @@
 const { z } = require('zod')
 
 const categorySchema = z.enum(['Music', 'Comedy', 'Business', 'Sports', 'Food', 'Arts', 'Technology', 'Other'])
-const statusSchema = z.enum(['draft', 'published', 'cancelled', 'completed'])
+const statusSchema = z.enum(['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'rejected', 'published', 'cancelled', 'completed'])
 
 const seatSchema = z.object({
   number: z.string().trim().min(1).max(20),
@@ -48,7 +48,13 @@ const updateEventSchema = eventPayloadSchema
     message: 'End date must be after start date',
   })
 
+const reviewEventSchema = z.object({
+  status: z.enum(['under_review', 'approved', 'rejected', 'changes_requested']),
+  reviewNote: z.string().trim().max(1000).optional().default(''),
+})
+
 module.exports = {
   createEventSchema,
+  reviewEventSchema,
   updateEventSchema,
 }

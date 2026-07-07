@@ -257,9 +257,13 @@ async function verifyPaymentAndCreateBooking(req, res, next) {
       throw new ApiError(400, 'Invalid payment signature')
     }
 
-    const payment = await razorpay.payments.fetch(razorpayPaymentId)
+    let payment = await razorpay.payments.fetch(razorpayPaymentId)
     if (!payment || payment.order_id !== order.id) {
       throw new ApiError(400, 'Payment does not match this order')
+    }
+
+    if (payment.status === 'authorized') {
+      payment = await razorpay.payments.capture(razorpayPaymentId, order.amount, order.currency)
     }
 
     if (payment.status !== 'captured') {

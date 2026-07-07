@@ -4,11 +4,13 @@ const {
   changePasswordSchema,
   loginSchema,
   registerSchema,
+  requestOrganizerAccessSchema,
   updateProfileSchema,
 } = require('../src/validators/authValidator')
+const { reviewOrganizerRequestSchema, updateUserRoleSchema } = require('../src/validators/adminValidator')
 const { createBookingSchema, seatLockSchema, verifyPaymentSchema } = require('../src/validators/bookingValidator')
 const { createContactMessageSchema, updateContactMessageStatusSchema } = require('../src/validators/contactValidator')
-const { createEventSchema } = require('../src/validators/eventValidator')
+const { createEventSchema, reviewEventSchema } = require('../src/validators/eventValidator')
 
 test('register schema accepts valid user payload', () => {
   const result = registerSchema.safeParse({
@@ -49,6 +51,32 @@ test('password change schema requires strong new password', () => {
   assert.equal(result.success, false)
 })
 
+test('organizer request schema accepts a lightweight application', () => {
+  const result = requestOrganizerAccessSchema.safeParse({
+    organizationName: 'Small Hall Collective',
+    phone: '+91 9876543210',
+    message: 'We host small music events twice a month.',
+  })
+
+  assert.equal(result.success, true)
+})
+
+test('organizer review schema rejects pending status', () => {
+  const result = reviewOrganizerRequestSchema.safeParse({
+    status: 'pending',
+  })
+
+  assert.equal(result.success, false)
+})
+
+test('user role schema accepts organizer role', () => {
+  const result = updateUserRoleSchema.safeParse({
+    role: 'organizer',
+  })
+
+  assert.equal(result.success, true)
+})
+
 test('contact schema accepts a support message', () => {
   const result = createContactMessageSchema.safeParse({
     name: 'Regular User',
@@ -85,6 +113,23 @@ test('event schema rejects end date before start date', () => {
     priceFrom: 500,
     totalSeats: 50,
     status: 'draft',
+  })
+
+  assert.equal(result.success, false)
+})
+
+test('event review schema accepts approved review decisions', () => {
+  const result = reviewEventSchema.safeParse({
+    status: 'approved',
+    reviewNote: 'Looks ready.',
+  })
+
+  assert.equal(result.success, true)
+})
+
+test('event review schema rejects publish decisions', () => {
+  const result = reviewEventSchema.safeParse({
+    status: 'published',
   })
 
   assert.equal(result.success, false)

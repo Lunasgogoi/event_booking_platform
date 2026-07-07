@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError')
 const generateToken = require('../utils/generateToken')
 const env = require('../config/env')
 const { deleteAsset, uploadBuffer } = require('../services/cloudinaryService')
+const { sendEmail } = require('../services/emailService')
 
 function cookieOptions() {
   return {
@@ -78,6 +79,65 @@ function getMe(req, res) {
     message: 'Current user fetched successfully',
     user: req.user,
   })
+}
+
+async function requestOrganizerAccess(req, res, next) {
+  try {
+    const { organizationName, phone, message } = req.body
+    const status = req.user.organizerProfile?.status || 'none'
+
+    if (req.user.role === 'admin') {
+      throw new ApiError(400, 'Admin accounts do not need organizer access')
+    }
+
+    if (status === 'pending') {
+      throw new ApiError(409, 'Organizer access request is already pending')
+    }
+
+    if (status === 'approved') {
+      throw new ApiError(409, 'Organizer access is already approved')
+    }
+
+    if (status === 'suspended') {
+      throw new ApiError(403, 'Organizer access is suspended')
+    }
+
+    req.user.organizerProfile = {
+      ...req.user.organizerProfile,
+      status: 'pending',
+      organizationName,
+      phone,
+      message,
+      requestedAt: new Date(),
+      reviewedAt: undefined,
+      reviewedBy: undefined,
+      reviewNote: '',
+    }
+    await req.user.save({ validateBeforeSave: false })
+
+    await Promise.all([
+      sendEmail({
+        to: req.user.email,
+        subject: 'Organizer request received',
+        text: `Hi ${req.user.name}, your organizer access request for ${organizationName} has been received and is pending admin review.`,
+        html: `<p>Hi ${req.user.name},</p><p>Your organizer access request for <strong>${organizationName}</strong> has been received and is pending admin review.</p>`,
+      }),
+      sendEmail({
+        to: env.SUPPORT_EMAIL,
+        subject: 'New organizer request',
+        text: `${req.user.name} (${req.user.email}) requested organizer access for ${organizationName}.`,
+        html: `<p><strong>${req.user.name}</strong> (${req.user.email}) requested organizer access for <strong>${organizationName}</strong>.</p>`,
+      }),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Organizer access request submitted successfully',
+      user: req.user,
+    })
+  } catch (error) {
+    next(error)
+  }
 }
 
 async function updateMe(req, res, next) {
@@ -163,6 +223,7 @@ module.exports = {
   login,
   logout,
   getMe,
+  requestOrganizerAccess,
   updateAvatar,
   updateMe,
 }

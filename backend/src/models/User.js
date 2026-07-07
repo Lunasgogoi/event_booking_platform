@@ -26,8 +26,42 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'organizer', 'admin'],
       default: 'user',
+    },
+    organizerProfile: {
+      status: {
+        type: String,
+        enum: ['none', 'pending', 'approved', 'rejected', 'suspended'],
+        default: 'none',
+        index: true,
+      },
+      organizationName: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+      },
+      phone: {
+        type: String,
+        trim: true,
+        maxlength: 30,
+      },
+      message: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+      },
+      requestedAt: Date,
+      reviewedAt: Date,
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      reviewNote: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+      },
     },
     avatar: {
       url: String,

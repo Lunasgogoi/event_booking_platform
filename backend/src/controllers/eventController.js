@@ -1,8 +1,10 @@
 const mongoose = require('mongoose')
 const Event = require('../models/Event')
 const ApiError = require('../utils/ApiError')
+const env = require('../config/env')
 const { deleteCachePattern, getCache, setCache } = require('../services/cacheService')
 const { deleteAsset, uploadBuffer } = require('../services/cloudinaryService')
+const { sendEmail } = require('../services/emailService')
 const { getSeatLocks } = require('../services/seatLockService')
 const { ensureEventCanBePublished, ensureEventIsPublic } = require('../utils/eventLifecycle')
 
@@ -66,6 +68,64 @@ async function clearEventCaches() {
   await deleteCachePattern('events:public:*').catch(() => null)
 }
 
+function ensureEventOwner(req, event) {
+  const ownerId = event.createdBy?._id || event.createdBy
+  if (String(ownerId) !== String(req.user._id)) {
+    throw new ApiError(403, 'You do not have permission to manage this event')
+  }
+}
+
+function ensureOrganizerEditableEvent(event) {
+  if (!['draft', 'changes_requested', 'rejected'].includes(event.status)) {
+    throw new ApiError(400, 'Only draft events or events needing changes can be changed by organizers')
+  }
+}
+
+function ensureOrganizerSubmittableEvent(event) {
+  if (!['draft', 'changes_requested', 'rejected'].includes(event.status)) {
+    throw new ApiError(400, 'Only draft events or events needing changes can be submitted')
+  }
+
+  ensureEventCanBePublished(event)
+}
+
+async function applyEventUpdates(event, payload) {
+  const previousPosterPublicId = event.poster?.publicId
+
+  if (payload.status && payload.status !== event.status) {
+    throw new ApiError(400, 'Use the dedicated workflow endpoint to change event status')
+  }
+
+  Object.assign(event, payload)
+
+  if (payload.title) {
+    event.slug = await createUniqueSlug(payload.title, event._id)
+  }
+
+  if (payload.seats?.length) {
+    event.totalSeats = payload.seats.length
+    event.availableSeats = payload.seats.filter((seat) => seat.status === 'available').length
+  } else if (payload.totalSeats && event.status === 'draft') {
+    event.seats = buildSeats(payload.totalSeats, payload.priceFrom || event.priceFrom)
+    event.totalSeats = event.seats.length
+    event.availableSeats = event.seats.length
+  } else if (payload.totalSeats && event.seats.length === 0) {
+    event.seats = buildSeats(payload.totalSeats, payload.priceFrom || event.priceFrom)
+    event.availableSeats = event.seats.length
+  }
+
+  if (event.status === 'published') {
+    ensureEventCanBePublished(event)
+  }
+
+  await event.save()
+  if (payload.poster?.publicId && previousPosterPublicId !== payload.poster.publicId) {
+    await deleteAsset(previousPosterPublicId)
+  }
+
+  return event
+}
+
 async function createEvent(req, res, next) {
   try {
     const payload = req.body
@@ -86,6 +146,62 @@ async function createEvent(req, res, next) {
     res.status(201).json({
       success: true,
       message: 'Event created successfully',
+      event,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function getOrganizerEvents(req, res, next) {
+  try {
+    const { page = 1, limit = 50 } = req.query
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+    const query = { createdBy: req.user._id }
+    const [events, total] = await Promise.all([
+      Event.find(query)
+        .sort({ createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .populate('createdBy', 'name email'),
+      Event.countDocuments(query),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Organizer events fetched successfully',
+      events,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize),
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function createOrganizerEvent(req, res, next) {
+  try {
+    const payload = req.body
+    const seats = payload.seats?.length ? payload.seats : buildSeats(payload.totalSeats, payload.priceFrom)
+
+    const event = await Event.create({
+      ...payload,
+      status: 'draft',
+      slug: await createUniqueSlug(payload.title),
+      seats,
+      totalSeats: seats.length,
+      availableSeats: seats.filter((seat) => seat.status === 'available').length,
+      createdBy: req.user._id,
+    })
+
+    res.status(201).json({
+      success: true,
+      message: 'Draft event created successfully',
       event,
     })
   } catch (error) {
@@ -192,13 +308,55 @@ async function getAdminEvents(req, res, next) {
         .sort({ createdAt: -1 })
         .skip((pageNumber - 1) * pageSize)
         .limit(pageSize)
-        .populate('createdBy', 'name email'),
+        .populate('createdBy', 'name email role'),
       Event.countDocuments(),
     ])
 
     res.status(200).json({
       success: true,
       message: 'Events fetched successfully',
+      events,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize),
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function getAdminReviewEvents(req, res, next) {
+  try {
+    const { status = 'submitted', page = 1, limit = 50 } = req.query
+    const reviewStatuses = ['submitted', 'under_review', 'changes_requested', 'approved', 'rejected']
+    const query = {}
+
+    if (status === 'all') {
+      query.status = { $in: reviewStatuses }
+    } else if (reviewStatuses.includes(status)) {
+      query.status = status
+    } else {
+      throw new ApiError(400, 'Invalid review status')
+    }
+
+    const pageNumber = Math.max(Number(page), 1)
+    const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+    const [events, total] = await Promise.all([
+      Event.find(query)
+        .sort({ 'review.submittedAt': -1, createdAt: -1 })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .populate('createdBy', 'name email role')
+        .populate('review.reviewedBy', 'name email'),
+      Event.countDocuments(query),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Review events fetched successfully',
       events,
       pagination: {
         page: pageNumber,
@@ -289,39 +447,144 @@ async function updateEvent(req, res, next) {
     if (!event) {
       throw new ApiError(404, 'Event not found')
     }
-    const previousPosterPublicId = event.poster?.publicId
 
-    if (req.body.status && req.body.status !== event.status) {
-      throw new ApiError(400, 'Use the dedicated publish or cancel endpoint to change event status')
-    }
-
-    Object.assign(event, req.body)
-
-    if (req.body.title) {
-      event.slug = await createUniqueSlug(req.body.title, event._id)
-    }
-
-    if (req.body.seats?.length) {
-      event.totalSeats = req.body.seats.length
-      event.availableSeats = req.body.seats.filter((seat) => seat.status === 'available').length
-    } else if (req.body.totalSeats && event.seats.length === 0) {
-      event.seats = buildSeats(req.body.totalSeats, req.body.priceFrom || event.priceFrom)
-      event.availableSeats = event.seats.length
-    }
-
-    if (event.status === 'published') {
-      ensureEventCanBePublished(event)
-    }
-
-    await event.save()
-    if (req.body.poster?.publicId && previousPosterPublicId !== req.body.poster.publicId) {
-      await deleteAsset(previousPosterPublicId)
-    }
+    await applyEventUpdates(event, req.body)
     await clearEventCaches()
 
     res.status(200).json({
       success: true,
       message: 'Event updated successfully',
+      event,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function updateOrganizerEvent(req, res, next) {
+  try {
+    const { eventId } = req.params
+    ensureObjectId(eventId)
+
+    const event = await Event.findById(eventId)
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    ensureEventOwner(req, event)
+    ensureOrganizerEditableEvent(event)
+    await applyEventUpdates(event, req.body)
+
+    res.status(200).json({
+      success: true,
+      message: 'Draft event updated successfully',
+      event,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function submitOrganizerEvent(req, res, next) {
+  try {
+    const { eventId } = req.params
+    ensureObjectId(eventId)
+
+    const event = await Event.findById(eventId).populate('createdBy', 'name email')
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    ensureEventOwner(req, event)
+    ensureOrganizerSubmittableEvent(event)
+
+    event.status = 'submitted'
+    event.review = {
+      ...event.review,
+      submittedAt: new Date(),
+      reviewedAt: undefined,
+      reviewedBy: undefined,
+      note: '',
+    }
+    await event.save()
+
+    await Promise.all([
+      sendEmail({
+        to: req.user.email,
+        subject: 'Event submitted for review',
+        text: `Your event "${event.title}" has been submitted for admin review.`,
+        html: `<p>Your event <strong>${event.title}</strong> has been submitted for admin review.</p>`,
+      }),
+      sendEmail({
+        to: env.SUPPORT_EMAIL,
+        subject: 'Event review requested',
+        text: `${req.user.name} (${req.user.email}) submitted "${event.title}" for review.`,
+        html: `<p><strong>${req.user.name}</strong> (${req.user.email}) submitted <strong>${event.title}</strong> for review.</p>`,
+      }),
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Event submitted for review successfully',
+      event,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function reviewOrganizerEvent(req, res, next) {
+  try {
+    const { eventId } = req.params
+    const { status, reviewNote } = req.body
+    ensureObjectId(eventId)
+
+    const event = await Event.findById(eventId).populate('createdBy', 'name email role')
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    if (!['submitted', 'under_review', 'changes_requested', 'approved', 'rejected'].includes(event.status)) {
+      throw new ApiError(400, 'Event is not in the review workflow')
+    }
+
+    if (status === 'under_review' && event.status !== 'submitted') {
+      throw new ApiError(400, 'Only submitted events can be marked under review')
+    }
+
+    if (['approved', 'rejected', 'changes_requested'].includes(status) && !['submitted', 'under_review'].includes(event.status)) {
+      throw new ApiError(400, 'Only submitted or under review events can receive a review decision')
+    }
+
+    if (status === 'approved') {
+      ensureEventCanBePublished(event)
+    }
+
+    event.status = status
+    event.review = {
+      ...event.review,
+      reviewedAt: new Date(),
+      reviewedBy: req.user._id,
+      note: reviewNote,
+    }
+    await event.save()
+
+    const statusLabels = {
+      under_review: 'under review',
+      approved: 'approved',
+      rejected: 'rejected',
+      changes_requested: 'changes requested',
+    }
+    await sendEmail({
+      to: event.createdBy.email,
+      subject: `Event review update: ${statusLabels[status]}`,
+      text: `Your event "${event.title}" is now ${statusLabels[status]}.${reviewNote ? ` Note: ${reviewNote}` : ''}`,
+      html: `<p>Your event <strong>${event.title}</strong> is now <strong>${statusLabels[status]}</strong>.</p>${reviewNote ? `<p>${reviewNote}</p>` : ''}`,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Event review updated successfully',
       event,
     })
   } catch (error) {
@@ -337,6 +600,10 @@ async function publishEvent(req, res, next) {
     const event = await Event.findById(eventId)
     if (!event) {
       throw new ApiError(404, 'Event not found')
+    }
+
+    if (event.status !== 'draft') {
+      throw new ApiError(400, 'Only draft events can be published directly')
     }
 
     ensureEventCanBePublished(event)
@@ -404,14 +671,45 @@ async function deleteEvent(req, res, next) {
   }
 }
 
+async function deleteOrganizerEvent(req, res, next) {
+  try {
+    const { eventId } = req.params
+    ensureObjectId(eventId)
+
+    const event = await Event.findById(eventId)
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    ensureEventOwner(req, event)
+    ensureOrganizerEditableEvent(event)
+    await event.deleteOne()
+    await deleteAsset(event.poster?.publicId)
+
+    res.status(200).json({
+      success: true,
+      message: 'Draft event deleted successfully',
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 module.exports = {
   createEvent,
+  createOrganizerEvent,
+  deleteOrganizerEvent,
   uploadEventPoster,
+  getAdminReviewEvents,
   getPublishedEvents,
   getAdminEvents,
+  getOrganizerEvents,
   getEvent,
   getEventSeats,
   updateEvent,
+  updateOrganizerEvent,
+  reviewOrganizerEvent,
+  submitOrganizerEvent,
   publishEvent,
   cancelEvent,
   deleteEvent,

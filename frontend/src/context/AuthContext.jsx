@@ -59,6 +59,12 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  async function requestOrganizerAccess(payload) {
+    const { data } = await api.post('/auth/organizer-request', payload)
+    setUser(data.user)
+    return data.user
+  }
+
   const value = useMemo(
     () => ({
       changePassword,
@@ -67,6 +73,7 @@ export function AuthProvider({ children }) {
       isBootstrapping,
       login,
       register,
+      requestOrganizerAccess,
       logout,
       uploadAvatar,
       updateProfile,

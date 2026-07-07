@@ -3,6 +3,11 @@ process.env.MONGO_URI = 'mongodb://127.0.0.1:27017/event_booking_platform_test'
 process.env.REDIS_URL = 'redis://127.0.0.1:6379'
 process.env.AUTH_RATE_LIMIT_MAX = '1000'
 process.env.BOOKING_RATE_LIMIT_MAX = '1000'
+process.env.EMAIL_HOST = ''
+process.env.EMAIL_USER = ''
+process.env.EMAIL_PASS = ''
+process.env.RAZORPAY_KEY_ID = ''
+process.env.RAZORPAY_KEY_SECRET = ''
 
 const assert = require('node:assert/strict')
 const { after, before, beforeEach, test } = require('node:test')
@@ -313,6 +318,177 @@ test('admin user management lists and updates users', { timeout: 30000 }, async 
 
   assert.equal(selfDeactivateResponse.status, 400)
   assert.equal(selfDeactivateResponse.body.message, 'You cannot deactivate your own account')
+})
+
+test('organizer access request can be approved by admin', { timeout: 30000 }, async (t) => {
+  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+
+  const admin = await createUser('admin', 'admin-organizers')
+  const user = await createUser('user', 'organizer-applicant')
+
+  const requestResponse = await api('POST', '/api/auth/organizer-request', {
+    headers: bearer(user._id),
+    body: {
+      organizationName: 'Small Hall Collective',
+      phone: '+91 9876543210',
+      message: 'We host local music showcases.',
+    },
+  })
+
+  assert.equal(requestResponse.status, 200)
+  assert.equal(requestResponse.body.user.organizerProfile.status, 'pending')
+
+  const listResponse = await api('GET', '/api/admin/organizer-requests?status=pending', {
+    headers: bearer(admin._id),
+  })
+
+  assert.equal(listResponse.status, 200)
+  assert.equal(listResponse.body.organizerRequests.length, 1)
+  assert.equal(listResponse.body.organizerRequests[0].email, 'organizer-applicant@example.com')
+
+  const approveResponse = await api('PATCH', `/api/admin/organizer-requests/${user._id}/status`, {
+    headers: bearer(admin._id),
+    body: {
+      status: 'approved',
+    },
+  })
+
+  assert.equal(approveResponse.status, 200)
+  assert.equal(approveResponse.body.user.role, 'organizer')
+  assert.equal(approveResponse.body.user.organizerProfile.status, 'approved')
+})
+
+test('organizers can manage only their own draft events', { timeout: 30000 }, async (t) => {
+  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+
+  const organizer = await createUser('organizer', 'draft-organizer')
+  const otherOrganizer = await createUser('organizer', 'other-draft-organizer')
+
+  const createResponse = await api('POST', '/api/events/organizer', {
+    headers: bearer(organizer._id),
+    body: eventPayload({
+      title: 'Organizer Draft Event',
+      status: 'published',
+      totalSeats: 3,
+    }),
+  })
+
+  assert.equal(createResponse.status, 201)
+  assert.equal(createResponse.body.event.status, 'draft')
+  assert.equal(createResponse.body.event.createdBy, String(organizer._id))
+
+  const publicListResponse = await api('GET', '/api/events?search=Organizer%20Draft')
+  assert.equal(publicListResponse.status, 200)
+  assert.equal(publicListResponse.body.events.length, 0)
+
+  const ownListResponse = await api('GET', '/api/events/organizer/manage', {
+    headers: bearer(organizer._id),
+  })
+
+  assert.equal(ownListResponse.status, 200)
+  assert.equal(ownListResponse.body.events.length, 1)
+
+  const eventId = createResponse.body.event._id
+  const blockedUpdateResponse = await api('PATCH', `/api/events/organizer/${eventId}`, {
+    headers: bearer(otherOrganizer._id),
+    body: {
+      title: 'Hijacked Draft Event',
+    },
+  })
+
+  assert.equal(blockedUpdateResponse.status, 403)
+
+  const updateResponse = await api('PATCH', `/api/events/organizer/${eventId}`, {
+    headers: bearer(organizer._id),
+    body: {
+      title: 'Updated Organizer Draft Event',
+      totalSeats: 5,
+    },
+  })
+
+  assert.equal(updateResponse.status, 200)
+  assert.equal(updateResponse.body.event.title, 'Updated Organizer Draft Event')
+  assert.equal(updateResponse.body.event.totalSeats, 5)
+  assert.equal(updateResponse.body.event.seats.length, 5)
+
+  const deleteResponse = await api('DELETE', `/api/events/organizer/${eventId}`, {
+    headers: bearer(organizer._id),
+  })
+
+  assert.equal(deleteResponse.status, 200)
+})
+
+test('organizer draft submission and admin review keep event private', { timeout: 30000 }, async (t) => {
+  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+
+  const admin = await createUser('admin', 'admin-event-review')
+  const organizer = await createUser('organizer', 'event-review-organizer')
+
+  const createResponse = await api('POST', '/api/events/organizer', {
+    headers: bearer(organizer._id),
+    body: eventPayload({
+      title: 'Reviewed Organizer Event',
+      totalSeats: 3,
+    }),
+  })
+
+  assert.equal(createResponse.status, 201)
+  const eventId = createResponse.body.event._id
+
+  const submitResponse = await api('PATCH', `/api/events/organizer/${eventId}/submit`, {
+    headers: bearer(organizer._id),
+  })
+
+  assert.equal(submitResponse.status, 200)
+  assert.equal(submitResponse.body.event.status, 'submitted')
+
+  const blockedEditResponse = await api('PATCH', `/api/events/organizer/${eventId}`, {
+    headers: bearer(organizer._id),
+    body: {
+      title: 'Edited Submitted Event',
+    },
+  })
+
+  assert.equal(blockedEditResponse.status, 400)
+
+  const reviewListResponse = await api('GET', '/api/events/admin/review?status=submitted', {
+    headers: bearer(admin._id),
+  })
+
+  assert.equal(reviewListResponse.status, 200)
+  assert.equal(reviewListResponse.body.events.length, 1)
+
+  const underReviewResponse = await api('PATCH', `/api/events/${eventId}/review`, {
+    headers: bearer(admin._id),
+    body: {
+      status: 'under_review',
+    },
+  })
+
+  assert.equal(underReviewResponse.status, 200)
+  assert.equal(underReviewResponse.body.event.status, 'under_review')
+
+  const approveResponse = await api('PATCH', `/api/events/${eventId}/review`, {
+    headers: bearer(admin._id),
+    body: {
+      status: 'approved',
+      reviewNote: 'Approved for the payment step.',
+    },
+  })
+
+  assert.equal(approveResponse.status, 200)
+  assert.equal(approveResponse.body.event.status, 'approved')
+
+  const publicListResponse = await api('GET', '/api/events?search=Reviewed%20Organizer')
+  assert.equal(publicListResponse.status, 200)
+  assert.equal(publicListResponse.body.events.length, 0)
+
+  const publishResponse = await api('PATCH', `/api/events/${eventId}/publish`, {
+    headers: bearer(admin._id),
+  })
+
+  assert.equal(publishResponse.status, 400)
+  assert.equal(publishResponse.body.message, 'Only draft events can be published directly')
 })
 
 test('seat lock and release flow works against MongoDB and Redis', { timeout: 30000 }, async (t) => {

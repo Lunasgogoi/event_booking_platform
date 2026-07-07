@@ -169,6 +169,34 @@ function getAvatarUrl(user) {
   return user?.avatar?.url || user?.avatarUrl || ''
 }
 
+function formatOrganizerStatus(status) {
+  const labels = {
+    none: 'Not requested',
+    pending: 'Pending review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    suspended: 'Suspended',
+  }
+
+  return labels[status || 'none'] || 'Not requested'
+}
+
+function formatEventStatus(status) {
+  const labels = {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    under_review: 'Under review',
+    changes_requested: 'Changes requested',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    published: 'Published',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+  }
+
+  return labels[status] || status
+}
+
 function getCurrentTimestamp() {
   return Date.now()
 }
@@ -243,6 +271,14 @@ function App() {
               </AdminRoute>
             )}
           />
+          <Route
+            path="/organizer/events"
+            element={(
+              <OrganizerRoute>
+                <ManageEventsPage scope="organizer" />
+              </OrganizerRoute>
+            )}
+          />
           <Route path="/login" element={<ConnectedAuthPage mode="login" />} />
           <Route path="/register" element={<ConnectedAuthPage mode="register" />} />
         </Routes>
@@ -286,6 +322,28 @@ function AdminRoute({ children }) {
 
   if (user?.role !== 'admin') {
     return <Navigate to="/events" replace />
+  }
+
+  return children
+}
+
+function OrganizerRoute({ children }) {
+  const { isAuthenticated, isBootstrapping, user } = useAuth()
+
+  if (isBootstrapping) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <p className="text-sm font-semibold text-slate-500">Checking access...</p>
+      </main>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (user?.role !== 'organizer') {
+    return <Navigate to="/settings" replace />
   }
 
   return children
@@ -418,6 +476,7 @@ function Shell({ children, theme, onToggleTheme }) {
   const links = [
     { to: '/events', label: 'Events' },
     { to: '/bookings', label: 'My bookings' },
+    user?.role === 'organizer' ? { to: '/organizer/events', label: 'Organizer' } : null,
     user?.role === 'admin' ? { to: '/admin', label: 'Admin' } : null,
   ].filter(Boolean)
 
@@ -798,13 +857,15 @@ function EventsPage() {
 }
 
 function SettingsPage() {
-  const { changePassword, updateProfile, uploadAvatar, user } = useAuth()
+  const { changePassword, requestOrganizerAccess, updateProfile, uploadAvatar, user } = useAuth()
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState('')
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const avatarPreviewRef = useRef('')
   const avatarUrl = getAvatarUrl(user)
   const avatarDisplayUrl = avatarPreview || avatarUrl
+  const organizerStatus = user?.organizerProfile?.status || 'none'
+  const canRequestOrganizerAccess = user?.role !== 'admin' && !['pending', 'approved', 'suspended'].includes(organizerStatus)
   const {
     register: registerProfileField,
     handleSubmit: handleProfileSubmit,
@@ -828,6 +889,18 @@ function SettingsPage() {
       confirmPassword: '',
     },
   })
+  const {
+    register: registerOrganizerField,
+    handleSubmit: handleOrganizerSubmit,
+    reset: resetOrganizerForm,
+    formState: { isSubmitting: isSubmittingOrganizer },
+  } = useForm({
+    defaultValues: {
+      organizationName: user?.organizerProfile?.organizationName || '',
+      phone: user?.organizerProfile?.phone || '',
+      message: '',
+    },
+  })
 
   useEffect(() => {
     resetProfile({
@@ -835,6 +908,14 @@ function SettingsPage() {
       email: user?.email || '',
     })
   }, [resetProfile, user?.email, user?.name])
+
+  useEffect(() => {
+    resetOrganizerForm({
+      organizationName: user?.organizerProfile?.organizationName || '',
+      phone: user?.organizerProfile?.phone || '',
+      message: '',
+    })
+  }, [resetOrganizerForm, user?.organizerProfile?.organizationName, user?.organizerProfile?.phone])
 
   useEffect(() => {
     return () => {
@@ -914,6 +995,20 @@ function SettingsPage() {
     }
   }
 
+  async function submitOrganizerRequest(values) {
+    try {
+      await requestOrganizerAccess(values)
+      resetOrganizerForm({
+        organizationName: values.organizationName,
+        phone: values.phone,
+        message: '',
+      })
+      toast.success('Organizer request submitted')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <SectionTitle kicker="Account" title="Settings" />
@@ -935,7 +1030,10 @@ function SettingsPage() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 text-sm">
-            <SettingsRow label="Role" value={user?.role === 'admin' ? 'Admin' : 'Customer'} />
+            {user?.role === 'admin' && <SettingsRow label="Role" value="Admin" />}
+            {user?.role === 'organizer' && <SettingsRow label="Role" value="Organizer" />}
+            {user?.role !== 'admin' && user?.role !== 'organizer' && <SettingsRow label="Role" value="Customer" />}
+            <SettingsRow label="Organizer status" value={formatOrganizerStatus(organizerStatus)} />
             <SettingsRow label="Booking alerts" value="Sent to your account email" />
             <SettingsRow label="Support channel" value={supportEmail} />
           </div>
@@ -1034,6 +1132,79 @@ function SettingsPage() {
               {isSavingPassword ? 'Changing...' : 'Change password'}
             </button>
           </form>
+
+          <section className="rounded border border-slate-200 bg-white p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">Organizer access</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  Apply to create event drafts after an admin reviews your organizer profile.
+                </p>
+              </div>
+              <span className="w-fit rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                {formatOrganizerStatus(organizerStatus)}
+              </span>
+            </div>
+
+            {organizerStatus === 'pending' && (
+              <p className="mt-5 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                Your request is waiting for admin review.
+              </p>
+            )}
+            {organizerStatus === 'approved' && (
+              <p className="mt-5 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                Organizer access is active. Event draft tools will be added in the next rollout level.
+              </p>
+            )}
+            {organizerStatus === 'suspended' && (
+              <p className="mt-5 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+                Organizer access is suspended. Contact support before applying again.
+              </p>
+            )}
+            {user?.organizerProfile?.reviewNote && (
+              <p className="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                {user.organizerProfile.reviewNote}
+              </p>
+            )}
+
+            {canRequestOrganizerAccess && (
+              <form onSubmit={handleOrganizerSubmit(submitOrganizerRequest)} className="mt-5 grid gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                    Organization name
+                    <input
+                      {...registerOrganizerField('organizationName', { required: true, minLength: 2 })}
+                      required
+                      minLength={2}
+                      className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                    Phone
+                    <input
+                      {...registerOrganizerField('phone')}
+                      className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                    />
+                  </label>
+                </div>
+                <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                  Message
+                  <textarea
+                    {...registerOrganizerField('message')}
+                    rows={3}
+                    className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-slate-950 outline-none focus:border-rose-500"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={isSubmittingOrganizer}
+                  className="w-fit rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isSubmittingOrganizer ? 'Submitting...' : organizerStatus === 'rejected' ? 'Apply again' : 'Request access'}
+                </button>
+              </form>
+            )}
+          </section>
         </div>
       </div>
     </main>
@@ -1609,24 +1780,22 @@ function BookingsPage() {
 
     const event = booking.event ? normalizeEvent(booking.event) : null
     const seatNumbers = booking.seats.map((seat) => seat.number).join(', ')
-    const printWindow = window.open('', '_blank', 'width=720,height=840')
-
-    if (!printWindow) {
-      toast.error('Allow popups to print this ticket')
-      return
-    }
-
-    printWindow.document.write(`
+    const printHtml = `
       <!doctype html>
       <html>
         <head>
           <title>${escapeMarkup(booking.bookingCode)}</title>
           <style>
-            body { font-family: Arial, sans-serif; color: #17201d; padding: 32px; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; color: #17201d; margin: 0; padding: 32px; }
             .ticket { border: 1px solid #dce6e2; padding: 24px; max-width: 560px; }
-            h1 { margin: 0 0 8px; font-size: 28px; }
+            h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.15; }
             p { margin: 8px 0; }
             img { width: 180px; height: 180px; margin-top: 20px; }
+            @media print {
+              body { padding: 0; }
+              .ticket { border-color: #aebbb6; }
+            }
           </style>
         </head>
         <body>
@@ -1639,12 +1808,27 @@ function BookingsPage() {
             ${event ? `<p><strong>Venue:</strong> ${escapeMarkup(`${event.venue}, ${event.city}`)}</p>` : ''}
             <img src="${booking.qrCode.dataUrl}" alt="Booking QR code" />
           </section>
+          <script>
+            window.addEventListener('load', function () {
+              window.focus();
+              setTimeout(function () {
+                window.print();
+              }, 250);
+            });
+          </script>
         </body>
       </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
+    `
+    const printUrl = URL.createObjectURL(new Blob([printHtml], { type: 'text/html' }))
+    const printWindow = window.open(printUrl, '_blank', 'width=720,height=840')
+
+    if (!printWindow) {
+      URL.revokeObjectURL(printUrl)
+      toast.error('Allow popups to print this ticket')
+      return
+    }
+
+    setTimeout(() => URL.revokeObjectURL(printUrl), 60_000)
   }
 
   async function cancelBooking() {
@@ -1771,6 +1955,7 @@ function BookingsPage() {
 function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [supportMessages, setSupportMessages] = useState([])
+  const [organizerRequests, setOrganizerRequests] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -1779,12 +1964,14 @@ function AdminDashboardPage() {
     setLoadError('')
 
     try {
-      const [{ data: dashboardData }, { data: contactData }] = await Promise.all([
+      const [{ data: dashboardData }, { data: contactData }, { data: organizerData }] = await Promise.all([
         api.get('/admin/dashboard'),
         api.get('/admin/contact-messages', { params: { limit: 5 } }),
+        api.get('/admin/organizer-requests', { params: { status: 'pending', limit: 5 } }),
       ])
       setDashboard(dashboardData)
       setSupportMessages(contactData.contactMessages || [])
+      setOrganizerRequests(organizerData.organizerRequests || [])
     } catch (error) {
       const message = getApiErrorMessage(error)
       setLoadError(message)
@@ -1806,6 +1993,17 @@ function AdminDashboardPage() {
         current.map((message) => (message._id === messageId ? data.contactMessage : message)),
       )
       toast.success('Support message updated')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
+  async function reviewOrganizerRequest(userId, status) {
+    try {
+      await api.patch(`/admin/organizer-requests/${userId}/status`, { status })
+      setOrganizerRequests((current) => current.filter((request) => request._id !== userId))
+      toast.success(status === 'approved' ? 'Organizer approved' : 'Organizer rejected')
+      loadDashboard()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
     }
@@ -1834,12 +2032,14 @@ function AdminDashboardPage() {
           <ListChecks size={18} /> Manage events
         </Link>
       </div>
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
         <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : '-'} icon={BarChart3} />
         <Stat label="Bookings" value={stats ? stats.bookings.toLocaleString('en-IN') : '-'} icon={Ticket} />
         <Stat label="Active users" value={stats ? stats.activeUsers.toLocaleString('en-IN') : '-'} icon={Users} />
         <Stat label="Fill rate" value={stats ? `${stats.fillRate}%` : '-'} icon={CheckCircle2} />
         <Stat label="New support" value={stats ? (stats.supportMessages?.new || 0).toLocaleString('en-IN') : '-'} icon={Mail} />
+        <Stat label="Organizer requests" value={stats ? (stats.organizerRequests?.pending || 0).toLocaleString('en-IN') : '-'} icon={Users} />
+        <Stat label="Event reviews" value={stats ? (stats.eventReviews?.pending || 0).toLocaleString('en-IN') : '-'} icon={ListChecks} />
       </div>
       {isLoading && <p className="mt-4 text-sm font-semibold text-slate-500">Loading dashboard analytics...</p>}
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_0.9fr]">
@@ -1863,8 +2063,53 @@ function AdminDashboardPage() {
             ))}
           </div>
         </div>
-        <div className="rounded border border-slate-200 bg-white p-5">
-          <h2 className="text-xl font-semibold">Support queue</h2>
+        <div className="grid gap-5">
+          <div className="rounded border border-slate-200 bg-white p-5">
+            <h2 className="text-xl font-semibold">Organizer requests</h2>
+            <div className="mt-5 space-y-4">
+              {!isLoading && organizerRequests.length === 0 && (
+                <p className="text-sm font-semibold text-slate-500">No pending organizer requests.</p>
+              )}
+              {organizerRequests.map((request) => (
+                <div key={request._id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-950">
+                        {request.organizerProfile?.organizationName || request.name}
+                      </p>
+                      <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                        {request.name} - {request.email}
+                      </p>
+                    </div>
+                    <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                      {formatOrganizerStatus(request.organizerProfile?.status)}
+                    </span>
+                  </div>
+                  {request.organizerProfile?.message && (
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{request.organizerProfile.message}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => reviewOrganizerRequest(request._id, 'approved')}
+                      className="rounded border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => reviewOrganizerRequest(request._id, 'rejected')}
+                      className="rounded border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded border border-slate-200 bg-white p-5">
+            <h2 className="text-xl font-semibold">Support queue</h2>
           <div className="mt-5 space-y-4">
             {!isLoading && supportMessages.length === 0 && (
               <p className="text-sm font-semibold text-slate-500">No support messages yet.</p>
@@ -1906,13 +2151,21 @@ function AdminDashboardPage() {
               </div>
             ))}
           </div>
+          </div>
         </div>
       </div>
     </main>
   )
 }
 
-function ManageEventsPage() {
+function ManageEventsPage({ scope = 'admin' }) {
+  const isOrganizer = scope === 'organizer'
+  const listPath = isOrganizer ? '/events/organizer/manage' : '/events/admin/manage'
+  const createPath = isOrganizer ? '/events/organizer' : '/events'
+  const pageKicker = isOrganizer ? 'Organizer' : 'Admin'
+  const pageTitle = isOrganizer ? 'My event drafts' : 'Manage events'
+  const organizerEditableStatuses = ['draft', 'changes_requested', 'rejected']
+  const reviewDecisionStatuses = ['submitted', 'under_review']
   const [remoteEvents, setRemoteEvents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -1931,7 +2184,7 @@ function ManageEventsPage() {
     setLoadError('')
 
     try {
-      const { data } = await api.get('/events/admin/manage')
+      const { data } = await api.get(listPath)
       setRemoteEvents(data.events)
     } catch (error) {
       const message = getApiErrorMessage(error)
@@ -2012,9 +2265,9 @@ function ManageEventsPage() {
       }
 
       if (editingEvent) {
-        await api.patch(`/events/${editingEvent._id}`, payload)
+        await api.patch(isOrganizer ? `/events/organizer/${editingEvent._id}` : `/events/${editingEvent._id}`, payload)
       } else {
-        await api.post('/events', payload)
+        await api.post(createPath, payload)
       }
 
       toast.success(editingEvent ? 'Event updated' : 'Event created')
@@ -2035,10 +2288,37 @@ function ManageEventsPage() {
     }
   }
 
+  async function submitOrganizerDraft(eventId) {
+    try {
+      await api.patch(`/events/organizer/${eventId}/submit`)
+      toast.success('Event submitted for review')
+      loadEvents()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
+  async function reviewEvent(eventId, status) {
+    const needsNote = status === 'changes_requested' || status === 'rejected'
+    const reviewNote = needsNote ? window.prompt(status === 'changes_requested' ? 'What changes are needed?' : 'Why is this event rejected?') : ''
+
+    if (needsNote && reviewNote === null) {
+      return
+    }
+
+    try {
+      await api.patch(`/events/${eventId}/review`, { status, reviewNote: reviewNote || '' })
+      toast.success(`Event ${formatEventStatus(status).toLowerCase()}`)
+      loadEvents()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
   async function deleteEvent() {
     if (!deleteTarget) return
     try {
-      await api.delete(`/events/${deleteTarget._id}`)
+      await api.delete(isOrganizer ? `/events/organizer/${deleteTarget._id}` : `/events/${deleteTarget._id}`)
       toast.success('Event deleted')
       setDeleteTarget(null)
       loadEvents()
@@ -2055,6 +2335,13 @@ function ManageEventsPage() {
     date: new Date(event.startsAt),
     city: event.venue?.city,
     status: event.status,
+    canEdit: !isOrganizer || organizerEditableStatuses.includes(event.status),
+    canDelete: !isOrganizer || organizerEditableStatuses.includes(event.status),
+    canSubmit: isOrganizer && organizerEditableStatuses.includes(event.status),
+    canPublish: !isOrganizer && event.status === 'draft' && event.createdBy?.role === 'admin',
+    canCancel: !isOrganizer && event.status === 'published',
+    canMarkUnderReview: !isOrganizer && event.status === 'submitted',
+    canReview: !isOrganizer && reviewDecisionStatuses.includes(event.status),
     sold: event.totalSeats ? Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100) : 0,
     raw: event,
   }))
@@ -2062,7 +2349,7 @@ function ManageEventsPage() {
   if (loadError) {
     return (
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <SectionTitle kicker="Admin" title="Manage events" />
+        <SectionTitle kicker={pageKicker} title={pageTitle} />
         <div className="mt-6 rounded border border-rose-200 bg-white p-5 text-rose-700">
           <p className="font-semibold">Event management unavailable</p>
           <p className="mt-2 text-sm">{loadError}</p>
@@ -2074,7 +2361,7 @@ function ManageEventsPage() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <SectionTitle kicker="Admin" title="Manage events" />
+        <SectionTitle kicker={pageKicker} title={pageTitle} />
         <button
           type="button"
           onClick={() => {
@@ -2086,7 +2373,7 @@ function ManageEventsPage() {
           }}
           className="inline-flex w-fit items-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
         >
-          <Plus size={18} /> {showForm && !editingEvent ? 'Close form' : 'Create event'}
+          <Plus size={18} /> {showForm && !editingEvent ? 'Close form' : isOrganizer ? 'Create draft' : 'Create event'}
         </button>
       </div>
 
@@ -2095,7 +2382,11 @@ function ManageEventsPage() {
           <div className="mb-4">
             <h2 className="text-xl font-semibold text-slate-950">{editingEvent ? 'Edit event' : 'Create event'}</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {editingEvent ? 'Update event details and upload a new poster if needed.' : 'Create a draft event for review before publishing.'}
+              {editingEvent
+                ? 'Update event details and upload a new poster if needed.'
+                : isOrganizer
+                  ? 'Create a private draft, then submit it for admin review.'
+                  : 'Create a draft event for review before publishing.'}
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -2181,7 +2472,7 @@ function ManageEventsPage() {
               {!isLoading && rows.length === 0 && (
                 <tr>
                   <td colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
-                    No events found. Create your first event.
+                    {isOrganizer ? 'No draft events found. Create your first draft.' : 'No events found. Create your first event.'}
                   </td>
                 </tr>
               )}
@@ -2199,19 +2490,30 @@ function ManageEventsPage() {
                   <td className="px-4 py-4 font-semibold">{format(event.date, 'dd MMM yyyy')}</td>
                   <td className="px-4 py-4">{event.city}</td>
                   <td className="px-4 py-4">
-                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{event.status}</span>
+                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{formatEventStatus(event.status)}</span>
                   </td>
                   <td className="px-4 py-4">{event.sold}%</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditForm(event.raw)}
-                        className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
-                      >
-                        <Edit3 size={15} /> Edit
-                      </button>
-                      {event.status !== 'published' && (
+                      {event.canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => openEditForm(event.raw)}
+                          className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 font-medium"
+                        >
+                          <Edit3 size={15} /> Edit
+                        </button>
+                      )}
+                      {event.canSubmit && (
+                        <button
+                          type="button"
+                          onClick={() => submitOrganizerDraft(event.id)}
+                          className="rounded border border-slate-300 px-3 py-2 font-medium"
+                        >
+                          Submit
+                        </button>
+                      )}
+                      {event.canPublish && (
                         <button
                           type="button"
                           onClick={() => updateEventStatus(event.id, 'publish')}
@@ -2220,7 +2522,41 @@ function ManageEventsPage() {
                           <Edit3 size={15} /> Publish
                         </button>
                       )}
-                      {event.status !== 'cancelled' && (
+                      {event.canMarkUnderReview && (
+                        <button
+                          type="button"
+                          onClick={() => reviewEvent(event.id, 'under_review')}
+                          className="rounded border border-slate-300 px-3 py-2 font-medium"
+                        >
+                          Review
+                        </button>
+                      )}
+                      {event.canReview && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => reviewEvent(event.id, 'approved')}
+                            className="rounded border border-emerald-200 px-3 py-2 font-medium text-emerald-700"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reviewEvent(event.id, 'changes_requested')}
+                            className="rounded border border-amber-200 px-3 py-2 font-medium text-amber-700"
+                          >
+                            Changes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reviewEvent(event.id, 'rejected')}
+                            className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {event.canCancel && (
                         <button
                           type="button"
                           onClick={() => updateEventStatus(event.id, 'cancel')}
@@ -2229,13 +2565,15 @@ function ManageEventsPage() {
                           Cancel
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(event.raw)}
-                        className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
-                      >
-                        Delete
-                      </button>
+                      {event.canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(event.raw)}
+                          className="rounded border border-rose-200 px-3 py-2 font-medium text-rose-700"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

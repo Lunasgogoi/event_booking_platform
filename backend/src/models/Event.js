@@ -98,9 +98,22 @@ const eventSchema = new mongoose.Schema(
     seats: [seatSchema],
     status: {
       type: String,
-      enum: ['draft', 'published', 'cancelled', 'completed'],
+      enum: ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'rejected', 'published', 'cancelled', 'completed'],
       default: 'draft',
       index: true,
+    },
+    review: {
+      submittedAt: Date,
+      reviewedAt: Date,
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      note: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+      },
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
