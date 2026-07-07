@@ -83,7 +83,7 @@ function getMe(req, res) {
 
 async function requestOrganizerAccess(req, res, next) {
   try {
-    const { organizationName, phone, message } = req.body
+    const { organizationName, contactEmail, phone, city, website, eventTypes, message } = req.body
     const status = req.user.organizerProfile?.status || 'none'
 
     if (req.user.role === 'admin') {
@@ -106,7 +106,11 @@ async function requestOrganizerAccess(req, res, next) {
       ...req.user.organizerProfile,
       status: 'pending',
       organizationName,
+      contactEmail: contactEmail || req.user.email,
       phone,
+      city,
+      website,
+      eventTypes,
       message,
       requestedAt: new Date(),
       reviewedAt: undefined,

@@ -418,7 +418,7 @@ test('organizers can manage only their own draft events', { timeout: 30000 }, as
   assert.equal(deleteResponse.status, 200)
 })
 
-test('organizer draft submission and admin review keep event private', { timeout: 30000 }, async (t) => {
+test('organizer draft submission and zero-fee publish workflow', { timeout: 30000 }, async (t) => {
   if (!mongoAvailable) t.skip('MongoDB is unavailable')
 
   const admin = await createUser('admin', 'admin-event-review')
@@ -434,6 +434,13 @@ test('organizer draft submission and admin review keep event private', { timeout
 
   assert.equal(createResponse.status, 201)
   const eventId = createResponse.body.event._id
+
+  const earlyPublishResponse = await api('PATCH', `/api/events/organizer/${eventId}/publish`, {
+    headers: bearer(organizer._id),
+  })
+
+  assert.equal(earlyPublishResponse.status, 400)
+  assert.equal(earlyPublishResponse.body.message, 'Only approved organizer events can be published')
 
   const submitResponse = await api('PATCH', `/api/events/organizer/${eventId}/submit`, {
     headers: bearer(organizer._id),
@@ -478,6 +485,8 @@ test('organizer draft submission and admin review keep event private', { timeout
 
   assert.equal(approveResponse.status, 200)
   assert.equal(approveResponse.body.event.status, 'approved')
+  assert.equal(approveResponse.body.event.publishing.feeAmount, 0)
+  assert.equal(approveResponse.body.event.publishing.paymentStatus, 'not_required')
 
   const publicListResponse = await api('GET', '/api/events?search=Reviewed%20Organizer')
   assert.equal(publicListResponse.status, 200)
@@ -489,6 +498,18 @@ test('organizer draft submission and admin review keep event private', { timeout
 
   assert.equal(publishResponse.status, 400)
   assert.equal(publishResponse.body.message, 'Only draft events can be published directly')
+
+  const organizerPublishResponse = await api('PATCH', `/api/events/organizer/${eventId}/publish`, {
+    headers: bearer(organizer._id),
+  })
+
+  assert.equal(organizerPublishResponse.status, 200)
+  assert.equal(organizerPublishResponse.body.event.status, 'published')
+  assert.ok(organizerPublishResponse.body.event.publishing.publishedAt)
+
+  const publishedListResponse = await api('GET', '/api/events?search=Reviewed%20Organizer')
+  assert.equal(publishedListResponse.status, 200)
+  assert.equal(publishedListResponse.body.events.length, 1)
 })
 
 test('seat lock and release flow works against MongoDB and Redis', { timeout: 30000 }, async (t) => {

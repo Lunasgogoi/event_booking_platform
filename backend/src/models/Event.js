@@ -115,6 +115,26 @@ const eventSchema = new mongoose.Schema(
         maxlength: 1000,
       },
     },
+    publishing: {
+      feeAmount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      currency: {
+        type: String,
+        default: 'INR',
+        trim: true,
+        uppercase: true,
+      },
+      paymentStatus: {
+        type: String,
+        enum: ['not_required', 'pending', 'paid'],
+        default: 'not_required',
+      },
+      calculatedAt: Date,
+      publishedAt: Date,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

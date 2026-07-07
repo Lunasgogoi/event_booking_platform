@@ -197,6 +197,27 @@ function formatEventStatus(status) {
   return labels[status] || status
 }
 
+function getOrganizerLink(user) {
+  if (user?.role === 'organizer') {
+    return { to: '/organizer/events', label: 'Organizer dashboard' }
+  }
+
+  const status = user?.organizerProfile?.status || 'none'
+  if (status === 'pending') {
+    return { to: '/organizer/apply', label: 'Organizer request' }
+  }
+
+  if (status === 'rejected') {
+    return { to: '/organizer/apply', label: 'Apply again' }
+  }
+
+  if (status === 'suspended') {
+    return { to: '/organizer/apply', label: 'Organizer status' }
+  }
+
+  return { to: '/organizer/apply', label: 'Become organizer' }
+}
+
 function getCurrentTimestamp() {
   return Date.now()
 }
@@ -253,6 +274,14 @@ function App() {
               </ProtectedRoute>
             )}
           />
+          <Route
+            path="/organizer/apply"
+            element={(
+              <ProtectedRoute>
+                <OrganizerApplyPage />
+              </ProtectedRoute>
+            )}
+          />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route
@@ -268,6 +297,14 @@ function App() {
             element={(
               <AdminRoute>
                 <ManageEventsPage />
+              </AdminRoute>
+            )}
+          />
+          <Route
+            path="/admin/reviews"
+            element={(
+              <AdminRoute>
+                <ManageEventsPage scope="review" />
               </AdminRoute>
             )}
           />
@@ -368,6 +405,7 @@ function ProfileMenu({ user, onLogout }) {
   const menuRef = useRef(null)
   const avatarUrl = getAvatarUrl(user)
   const initial = getUserInitial(user)
+  const organizerLink = getOrganizerLink(user)
 
   useEffect(() => {
     if (!isOpen) {
@@ -431,6 +469,9 @@ function ProfileMenu({ user, onLogout }) {
           <div className="p-2">
             <ProfileMenuLink to="/settings" icon={Settings} label="Settings" onClick={closeMenu} />
             <ProfileMenuLink to="/about" icon={Info} label="About us" onClick={closeMenu} />
+            {user?.role !== 'admin' && (
+              <ProfileMenuLink to={organizerLink.to} icon={Users} label={organizerLink.label} onClick={closeMenu} />
+            )}
             <ProfileMenuLink to="/contact" icon={Mail} label="Contact us" onClick={closeMenu} />
           </div>
           <div className="border-t border-slate-200 p-2">
@@ -472,11 +513,12 @@ function Shell({ children, theme, onToggleTheme }) {
   const navigate = useNavigate()
   const { isAuthenticated, logout, user } = useAuth()
   const isDark = theme === 'dark'
+  const organizerLink = getOrganizerLink(user)
 
   const links = [
     { to: '/events', label: 'Events' },
     { to: '/bookings', label: 'My bookings' },
-    user?.role === 'organizer' ? { to: '/organizer/events', label: 'Organizer' } : null,
+    user?.role !== 'admin' ? organizerLink : null,
     user?.role === 'admin' ? { to: '/admin', label: 'Admin' } : null,
   ].filter(Boolean)
 
@@ -857,7 +899,7 @@ function EventsPage() {
 }
 
 function SettingsPage() {
-  const { changePassword, requestOrganizerAccess, updateProfile, uploadAvatar, user } = useAuth()
+  const { changePassword, updateProfile, uploadAvatar, user } = useAuth()
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState('')
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -865,7 +907,7 @@ function SettingsPage() {
   const avatarUrl = getAvatarUrl(user)
   const avatarDisplayUrl = avatarPreview || avatarUrl
   const organizerStatus = user?.organizerProfile?.status || 'none'
-  const canRequestOrganizerAccess = user?.role !== 'admin' && !['pending', 'approved', 'suspended'].includes(organizerStatus)
+  const organizerLink = getOrganizerLink(user)
   const {
     register: registerProfileField,
     handleSubmit: handleProfileSubmit,
@@ -889,18 +931,6 @@ function SettingsPage() {
       confirmPassword: '',
     },
   })
-  const {
-    register: registerOrganizerField,
-    handleSubmit: handleOrganizerSubmit,
-    reset: resetOrganizerForm,
-    formState: { isSubmitting: isSubmittingOrganizer },
-  } = useForm({
-    defaultValues: {
-      organizationName: user?.organizerProfile?.organizationName || '',
-      phone: user?.organizerProfile?.phone || '',
-      message: '',
-    },
-  })
 
   useEffect(() => {
     resetProfile({
@@ -908,14 +938,6 @@ function SettingsPage() {
       email: user?.email || '',
     })
   }, [resetProfile, user?.email, user?.name])
-
-  useEffect(() => {
-    resetOrganizerForm({
-      organizationName: user?.organizerProfile?.organizationName || '',
-      phone: user?.organizerProfile?.phone || '',
-      message: '',
-    })
-  }, [resetOrganizerForm, user?.organizerProfile?.organizationName, user?.organizerProfile?.phone])
 
   useEffect(() => {
     return () => {
@@ -990,20 +1012,6 @@ function SettingsPage() {
       })
       resetPassword()
       toast.success('Password changed')
-    } catch (error) {
-      toast.error(getApiErrorMessage(error))
-    }
-  }
-
-  async function submitOrganizerRequest(values) {
-    try {
-      await requestOrganizerAccess(values)
-      resetOrganizerForm({
-        organizationName: values.organizationName,
-        phone: values.phone,
-        message: '',
-      })
-      toast.success('Organizer request submitted')
     } catch (error) {
       toast.error(getApiErrorMessage(error))
     }
@@ -1138,7 +1146,7 @@ function SettingsPage() {
               <div>
                 <h2 className="text-xl font-semibold text-slate-950">Organizer access</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  Apply to create event drafts after an admin reviews your organizer profile.
+                  Manage your organizer application and event publishing access.
                 </p>
               </div>
               <span className="w-fit rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -1153,7 +1161,7 @@ function SettingsPage() {
             )}
             {organizerStatus === 'approved' && (
               <p className="mt-5 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-                Organizer access is active. Event draft tools will be added in the next rollout level.
+                Organizer access is active.
               </p>
             )}
             {organizerStatus === 'suspended' && (
@@ -1167,46 +1175,206 @@ function SettingsPage() {
               </p>
             )}
 
-            {canRequestOrganizerAccess && (
-              <form onSubmit={handleOrganizerSubmit(submitOrganizerRequest)} className="mt-5 grid gap-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="grid gap-2 text-sm font-semibold text-slate-700">
-                    Organization name
-                    <input
-                      {...registerOrganizerField('organizationName', { required: true, minLength: 2 })}
-                      required
-                      minLength={2}
-                      className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
-                    />
-                  </label>
-                  <label className="grid gap-2 text-sm font-semibold text-slate-700">
-                    Phone
-                    <input
-                      {...registerOrganizerField('phone')}
-                      className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
-                    />
-                  </label>
-                </div>
-                <label className="grid gap-2 text-sm font-semibold text-slate-700">
-                  Message
-                  <textarea
-                    {...registerOrganizerField('message')}
-                    rows={3}
-                    className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-slate-950 outline-none focus:border-rose-500"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={isSubmittingOrganizer}
-                  className="w-fit rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {isSubmittingOrganizer ? 'Submitting...' : organizerStatus === 'rejected' ? 'Apply again' : 'Request access'}
-                </button>
-              </form>
+            {user?.role !== 'admin' && (
+              <Link
+                to={organizerLink.to}
+                className="mt-5 inline-flex w-fit items-center gap-2 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                <Users size={17} /> {organizerLink.label}
+              </Link>
             )}
           </section>
         </div>
       </div>
+    </main>
+  )
+}
+
+function OrganizerApplyPage() {
+  const navigate = useNavigate()
+  const { requestOrganizerAccess, user } = useAuth()
+  const organizerStatus = user?.organizerProfile?.status || 'none'
+  const canApply = user?.role !== 'admin' && !['pending', 'approved', 'suspended'].includes(organizerStatus)
+  const {
+    register: registerOrganizerField,
+    handleSubmit: handleOrganizerSubmit,
+    reset: resetOrganizerForm,
+    formState: { isSubmitting },
+  } = useForm({
+    defaultValues: {
+      organizationName: user?.organizerProfile?.organizationName || '',
+      contactEmail: user?.organizerProfile?.contactEmail || user?.email || '',
+      phone: user?.organizerProfile?.phone || '',
+      city: user?.organizerProfile?.city || '',
+      website: user?.organizerProfile?.website || '',
+      eventTypes: user?.organizerProfile?.eventTypes?.join(', ') || '',
+      message: '',
+    },
+  })
+
+  useEffect(() => {
+    resetOrganizerForm({
+      organizationName: user?.organizerProfile?.organizationName || '',
+      contactEmail: user?.organizerProfile?.contactEmail || user?.email || '',
+      phone: user?.organizerProfile?.phone || '',
+      city: user?.organizerProfile?.city || '',
+      website: user?.organizerProfile?.website || '',
+      eventTypes: user?.organizerProfile?.eventTypes?.join(', ') || '',
+      message: '',
+    })
+  }, [
+    resetOrganizerForm,
+    user?.email,
+    user?.organizerProfile?.city,
+    user?.organizerProfile?.contactEmail,
+    user?.organizerProfile?.eventTypes,
+    user?.organizerProfile?.organizationName,
+    user?.organizerProfile?.phone,
+    user?.organizerProfile?.website,
+  ])
+
+  async function submitOrganizerRequest(values) {
+    const eventTypes = values.eventTypes
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    try {
+      await requestOrganizerAccess({
+        organizationName: values.organizationName,
+        contactEmail: values.contactEmail,
+        phone: values.phone,
+        city: values.city,
+        website: values.website,
+        eventTypes,
+        message: values.message,
+      })
+      toast.success('Organizer request submitted')
+      navigate('/settings')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <SectionTitle kicker="Organizer" title={user?.role === 'organizer' ? 'Organizer dashboard' : 'Become organizer'} />
+      <section className="mt-6 rounded border border-slate-200 bg-white p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">Organizer application</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Share the details an admin needs to review your organizer profile.
+            </p>
+          </div>
+          <span className="w-fit rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            {formatOrganizerStatus(organizerStatus)}
+          </span>
+        </div>
+
+        {user?.role === 'admin' && (
+          <p className="mt-5 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            Admin accounts do not need organizer access.
+          </p>
+        )}
+        {organizerStatus === 'pending' && (
+          <p className="mt-5 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+            Your organizer request is waiting for admin review.
+          </p>
+        )}
+        {organizerStatus === 'approved' && (
+          <div className="mt-5 rounded border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-800">Organizer access is active.</p>
+            <Link
+              to="/organizer/events"
+              className="mt-3 inline-flex w-fit items-center gap-2 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              <ListChecks size={17} /> Organizer dashboard
+            </Link>
+          </div>
+        )}
+        {organizerStatus === 'suspended' && (
+          <p className="mt-5 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+            Organizer access is suspended. Contact support before applying again.
+          </p>
+        )}
+        {user?.organizerProfile?.reviewNote && (
+          <p className="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            {user.organizerProfile.reviewNote}
+          </p>
+        )}
+
+        {canApply && (
+          <form onSubmit={handleOrganizerSubmit(submitOrganizerRequest)} className="mt-6 grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Organization name
+                <input
+                  {...registerOrganizerField('organizationName', { required: true, minLength: 2 })}
+                  required
+                  minLength={2}
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Contact email
+                <input
+                  {...registerOrganizerField('contactEmail', { required: true })}
+                  type="email"
+                  required
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Phone
+                <input
+                  {...registerOrganizerField('phone')}
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                City
+                <input
+                  {...registerOrganizerField('city')}
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Website or social link
+                <input
+                  {...registerOrganizerField('website')}
+                  type="url"
+                  placeholder="https://"
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-slate-700">
+                Event types
+                <input
+                  {...registerOrganizerField('eventTypes')}
+                  placeholder="Music, comedy, workshops"
+                  className="h-11 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
+                />
+              </label>
+            </div>
+            <label className="grid gap-2 text-sm font-semibold text-slate-700">
+              Message
+              <textarea
+                {...registerOrganizerField('message')}
+                rows={4}
+                className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-slate-950 outline-none focus:border-rose-500"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-fit rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isSubmitting ? 'Submitting...' : organizerStatus === 'rejected' ? 'Apply again' : 'Request organizer access'}
+            </button>
+          </form>
+        )}
+      </section>
     </main>
   )
 }
@@ -2028,9 +2196,14 @@ function AdminDashboardPage() {
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionTitle kicker="Admin" title="Dashboard" />
-        <Link to="/admin/events" className="inline-flex w-fit items-center gap-2 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
-          <ListChecks size={18} /> Manage events
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/admin/reviews" className="inline-flex w-fit items-center gap-2 rounded border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">
+            <ListChecks size={18} /> Review events
+          </Link>
+          <Link to="/admin/events" className="inline-flex w-fit items-center gap-2 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
+            <ListChecks size={18} /> Manage events
+          </Link>
+        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
         <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : '-'} icon={BarChart3} />
@@ -2088,6 +2261,14 @@ function AdminDashboardPage() {
                   {request.organizerProfile?.message && (
                     <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{request.organizerProfile.message}</p>
                   )}
+                  <div className="mt-3 grid gap-1 text-xs font-semibold text-slate-500">
+                    {request.organizerProfile?.contactEmail && <span>{request.organizerProfile.contactEmail}</span>}
+                    {request.organizerProfile?.city && <span>{request.organizerProfile.city}</span>}
+                    {request.organizerProfile?.website && <span>{request.organizerProfile.website}</span>}
+                    {request.organizerProfile?.eventTypes?.length > 0 && (
+                      <span>{request.organizerProfile.eventTypes.join(', ')}</span>
+                    )}
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -2160,12 +2341,20 @@ function AdminDashboardPage() {
 
 function ManageEventsPage({ scope = 'admin' }) {
   const isOrganizer = scope === 'organizer'
-  const listPath = isOrganizer ? '/events/organizer/manage' : '/events/admin/manage'
+  const isReviewQueue = scope === 'review'
+  const listPath = isOrganizer ? '/events/organizer/manage' : isReviewQueue ? '/events/admin/review?status=all' : '/events/admin/manage'
   const createPath = isOrganizer ? '/events/organizer' : '/events'
   const pageKicker = isOrganizer ? 'Organizer' : 'Admin'
-  const pageTitle = isOrganizer ? 'My event drafts' : 'Manage events'
+  const pageTitle = isOrganizer ? 'My event workflow' : isReviewQueue ? 'Event review queue' : 'Manage events'
   const organizerEditableStatuses = ['draft', 'changes_requested', 'rejected']
   const reviewDecisionStatuses = ['submitted', 'under_review']
+  const organizerSections = [
+    { key: 'drafts', title: 'Drafts and changes', statuses: ['draft', 'changes_requested', 'rejected'] },
+    { key: 'review', title: 'In review', statuses: ['submitted', 'under_review'] },
+    { key: 'approved', title: 'Ready to publish', statuses: ['approved'] },
+    { key: 'published', title: 'Published', statuses: ['published'] },
+    { key: 'inactive', title: 'Inactive', statuses: ['cancelled', 'completed'] },
+  ]
   const [remoteEvents, setRemoteEvents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -2298,6 +2487,16 @@ function ManageEventsPage({ scope = 'admin' }) {
     }
   }
 
+  async function publishOrganizerEvent(eventId) {
+    try {
+      await api.patch(`/events/organizer/${eventId}/publish`)
+      toast.success('Event published')
+      loadEvents()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
   async function reviewEvent(eventId, status) {
     const needsNote = status === 'changes_requested' || status === 'rejected'
     const reviewNote = needsNote ? window.prompt(status === 'changes_requested' ? 'What changes are needed?' : 'Why is this event rejected?') : ''
@@ -2335,16 +2534,30 @@ function ManageEventsPage({ scope = 'admin' }) {
     date: new Date(event.startsAt),
     city: event.venue?.city,
     status: event.status,
-    canEdit: !isOrganizer || organizerEditableStatuses.includes(event.status),
-    canDelete: !isOrganizer || organizerEditableStatuses.includes(event.status),
+    canEdit: isOrganizer ? organizerEditableStatuses.includes(event.status) : !isReviewQueue,
+    canDelete: isOrganizer ? organizerEditableStatuses.includes(event.status) : !isReviewQueue,
     canSubmit: isOrganizer && organizerEditableStatuses.includes(event.status),
-    canPublish: !isOrganizer && event.status === 'draft' && event.createdBy?.role === 'admin',
-    canCancel: !isOrganizer && event.status === 'published',
+    canPublishOrganizer: isOrganizer && event.status === 'approved' && event.publishing?.paymentStatus !== 'pending',
+    canPublish: !isOrganizer && !isReviewQueue && event.status === 'draft' && event.createdBy?.role === 'admin',
+    canCancel: !isOrganizer && !isReviewQueue && event.status === 'published',
     canMarkUnderReview: !isOrganizer && event.status === 'submitted',
     canReview: !isOrganizer && reviewDecisionStatuses.includes(event.status),
+    publishing: event.publishing,
     sold: event.totalSeats ? Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100) : 0,
     raw: event,
   }))
+  const organizerSummary = organizerSections.map((section) => ({
+    ...section,
+    count: rows.filter((event) => section.statuses.includes(event.status)).length,
+  }))
+  const displayRows = isOrganizer
+    ? organizerSections.flatMap((section) => {
+        const sectionRows = rows.filter((event) => section.statuses.includes(event.status))
+        return sectionRows.length
+          ? [{ type: 'section', key: section.key, title: section.title, count: sectionRows.length }, ...sectionRows.map((event) => ({ type: 'event', ...event }))]
+          : []
+      })
+    : rows.map((event) => ({ type: 'event', ...event }))
 
   if (loadError) {
     return (
@@ -2362,22 +2575,35 @@ function ManageEventsPage({ scope = 'admin' }) {
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionTitle kicker={pageKicker} title={pageTitle} />
-        <button
-          type="button"
-          onClick={() => {
-            if (showForm && !editingEvent) {
-              closeEventForm()
-            } else {
-              openCreateForm()
-            }
-          }}
-          className="inline-flex w-fit items-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
-        >
-          <Plus size={18} /> {showForm && !editingEvent ? 'Close form' : isOrganizer ? 'Create draft' : 'Create event'}
-        </button>
+        {!isReviewQueue && (
+          <button
+            type="button"
+            onClick={() => {
+              if (showForm && !editingEvent) {
+                closeEventForm()
+              } else {
+                openCreateForm()
+              }
+            }}
+            className="inline-flex w-fit items-center gap-2 rounded bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+          >
+            <Plus size={18} /> {showForm && !editingEvent ? 'Close form' : isOrganizer ? 'Create draft' : 'Create event'}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {isOrganizer && (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {organizerSummary.map((section) => (
+            <div key={section.key} className="rounded border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-500">{section.title}</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-950">{section.count}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && !isReviewQueue && (
         <form onSubmit={handleEventSubmit(submitEvent)} className="mb-6 rounded border border-slate-200 bg-white p-5">
           <div className="mb-4">
             <h2 className="text-xl font-semibold text-slate-950">{editingEvent ? 'Edit event' : 'Create event'}</h2>
@@ -2472,11 +2698,20 @@ function ManageEventsPage({ scope = 'admin' }) {
               {!isLoading && rows.length === 0 && (
                 <tr>
                   <td colSpan="6" className="px-4 py-8 text-center font-semibold text-slate-500">
-                    {isOrganizer ? 'No draft events found. Create your first draft.' : 'No events found. Create your first event.'}
+                    {isOrganizer ? 'No organizer events found. Create your first draft.' : isReviewQueue ? 'No events are waiting for review.' : 'No events found. Create your first event.'}
                   </td>
                 </tr>
               )}
-              {!isLoading && rows.map((event) => (
+              {!isLoading && displayRows.map((event) => event.type === 'section' ? (
+                <tr key={event.key} className="bg-slate-50">
+                  <td colSpan="6" className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-sm font-semibold text-slate-950">{event.title}</p>
+                      <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">{event.count}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
                 <tr key={event.id}>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
@@ -2491,6 +2726,11 @@ function ManageEventsPage({ scope = 'admin' }) {
                   <td className="px-4 py-4">{event.city}</td>
                   <td className="px-4 py-4">
                     <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{formatEventStatus(event.status)}</span>
+                    {isOrganizer && event.status === 'approved' && (
+                      <p className="mt-2 text-xs font-semibold text-emerald-700">
+                        {event.publishing?.feeAmount > 0 ? `${formatINR(event.publishing.feeAmount)} due` : 'No publishing fee'}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-4">{event.sold}%</td>
                   <td className="px-4 py-4">
@@ -2511,6 +2751,15 @@ function ManageEventsPage({ scope = 'admin' }) {
                           className="rounded border border-slate-300 px-3 py-2 font-medium"
                         >
                           Submit
+                        </button>
+                      )}
+                      {event.canPublishOrganizer && (
+                        <button
+                          type="button"
+                          onClick={() => publishOrganizerEvent(event.id)}
+                          className="rounded border border-emerald-200 px-3 py-2 font-medium text-emerald-700"
+                        >
+                          Publish
                         </button>
                       )}
                       {event.canPublish && (

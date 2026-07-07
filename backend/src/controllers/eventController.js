@@ -89,6 +89,15 @@ function ensureOrganizerSubmittableEvent(event) {
   ensureEventCanBePublished(event)
 }
 
+function calculatePublishingFee() {
+  return {
+    feeAmount: 0,
+    currency: env.RAZORPAY_CURRENCY || 'INR',
+    paymentStatus: 'not_required',
+    calculatedAt: new Date(),
+  }
+}
+
 async function applyEventUpdates(event, payload) {
   const previousPosterPublicId = event.poster?.publicId
 
@@ -558,6 +567,10 @@ async function reviewOrganizerEvent(req, res, next) {
 
     if (status === 'approved') {
       ensureEventCanBePublished(event)
+      event.publishing = {
+        ...event.publishing,
+        ...calculatePublishingFee(),
+      }
     }
 
     event.status = status
@@ -610,6 +623,52 @@ async function publishEvent(req, res, next) {
     event.status = 'published'
     await event.save()
     await clearEventCaches()
+
+    res.status(200).json({
+      success: true,
+      message: 'Event published successfully',
+      event,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function publishOrganizerEvent(req, res, next) {
+  try {
+    const { eventId } = req.params
+    ensureObjectId(eventId)
+
+    const event = await Event.findById(eventId)
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    ensureEventOwner(req, event)
+
+    if (event.status !== 'approved') {
+      throw new ApiError(400, 'Only approved organizer events can be published')
+    }
+
+    if (event.publishing?.paymentStatus === 'pending') {
+      throw new ApiError(402, 'Publishing payment is pending')
+    }
+
+    ensureEventCanBePublished(event)
+    event.status = 'published'
+    event.publishing = {
+      ...event.publishing,
+      publishedAt: new Date(),
+    }
+    await event.save()
+    await clearEventCaches()
+
+    await sendEmail({
+      to: req.user.email,
+      subject: 'Event published',
+      text: `Your event "${event.title}" is now published.`,
+      html: `<p>Your event <strong>${event.title}</strong> is now published.</p>`,
+    })
 
     res.status(200).json({
       success: true,
@@ -711,6 +770,7 @@ module.exports = {
   reviewOrganizerEvent,
   submitOrganizerEvent,
   publishEvent,
+  publishOrganizerEvent,
   cancelEvent,
   deleteEvent,
 }

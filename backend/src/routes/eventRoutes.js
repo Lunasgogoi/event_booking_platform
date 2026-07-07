@@ -12,6 +12,7 @@ const {
   getOrganizerEvents,
   getPublishedEvents,
   publishEvent,
+  publishOrganizerEvent,
   reviewOrganizerEvent,
   submitOrganizerEvent,
   uploadEventPoster,
@@ -36,6 +37,7 @@ router.post('/', protect, restrictTo('admin'), validateRequest(createEventSchema
 router.get('/:eventId/seats', getEventSeats)
 router.get('/:eventId', getEvent)
 router.patch('/organizer/:eventId/submit', protect, restrictTo('organizer'), submitOrganizerEvent)
+router.patch('/organizer/:eventId/publish', protect, restrictTo('organizer'), publishOrganizerEvent)
 router.patch('/organizer/:eventId', protect, restrictTo('organizer'), validateRequest(updateEventSchema), updateOrganizerEvent)
 router.patch('/:eventId/review', protect, restrictTo('admin'), validateRequest(reviewEventSchema), reviewOrganizerEvent)
 router.patch('/:eventId', protect, restrictTo('admin'), validateRequest(updateEventSchema), updateEvent)

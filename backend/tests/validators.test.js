@@ -61,6 +61,22 @@ test('organizer request schema accepts a lightweight application', () => {
   assert.equal(result.success, true)
 })
 
+test('organizer request schema accepts expanded application details', () => {
+  const result = requestOrganizerAccessSchema.safeParse({
+    organizationName: 'Small Hall Collective',
+    contactEmail: 'ORGANIZER@Example.COM',
+    phone: '+91 9876543210',
+    city: 'Mumbai',
+    website: 'https://example.com',
+    eventTypes: ['Music', 'Workshops'],
+    message: 'We host small music events twice a month.',
+  })
+
+  assert.equal(result.success, true)
+  assert.equal(result.data.contactEmail, 'organizer@example.com')
+  assert.deepEqual(result.data.eventTypes, ['Music', 'Workshops'])
+})
+
 test('organizer review schema rejects pending status', () => {
   const result = reviewOrganizerRequestSchema.safeParse({
     status: 'pending',

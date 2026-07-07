@@ -41,10 +41,30 @@ const userSchema = new mongoose.Schema(
         trim: true,
         maxlength: 120,
       },
+      contactEmail: {
+        type: String,
+        lowercase: true,
+        trim: true,
+        match: [/^\S+@\S+\.\S+$/, 'Enter a valid email'],
+      },
       phone: {
         type: String,
         trim: true,
         maxlength: 30,
+      },
+      city: {
+        type: String,
+        trim: true,
+        maxlength: 80,
+      },
+      website: {
+        type: String,
+        trim: true,
+        maxlength: 240,
+      },
+      eventTypes: {
+        type: [String],
+        default: [],
       },
       message: {
         type: String,
