@@ -278,6 +278,7 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('ticketo-theme', theme)
     document.documentElement.classList.toggle('theme-dark-root', isDark)
+    document.documentElement.classList.toggle('dark', isDark)
   }, [isDark, theme])
 
   function toggleTheme() {
