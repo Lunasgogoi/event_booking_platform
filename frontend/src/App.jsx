@@ -32,9 +32,13 @@ import {
   X,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { useAuth } from './context/useAuth'
 import api from './services/api'
 import { getApiErrorMessage } from './services/api'
@@ -3010,7 +3014,7 @@ function EventGrid({ items }) {
 
 function EventCard({ event }) {
   return (
-    <article className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+    <Card className="gap-0 overflow-hidden rounded border border-slate-200 bg-white py-0 shadow-sm ring-0 transition hover:-translate-y-1 hover:shadow-md">
       <Link to={`/events/${event.id}`} className="block">
         <div className="relative h-48">
           <EventPoster event={event} className="h-full w-full" />
@@ -3025,20 +3029,24 @@ function EventCard({ event }) {
           >
             <Heart size={18} />
           </button>
-          <span className="absolute left-3 top-3 rounded bg-white px-2 py-1 text-xs font-semibold text-slate-950">{event.category}</span>
+          <Badge variant="secondary" className="absolute left-3 top-3 h-auto rounded bg-white px-2 py-1 text-xs font-semibold text-slate-950 shadow">
+            {event.category}
+          </Badge>
         </div>
-        <div className="p-4">
+        <CardContent className="p-4">
           <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7">{event.title}</h3>
           <EventMeta event={event} />
           <div className="mt-4 flex items-center justify-between">
             <p className="text-sm text-slate-500">
               from <span className="font-semibold text-slate-950">INR {event.priceFrom.toLocaleString('en-IN')}</span>
             </p>
-            <span className="rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">{event.sold}% sold</span>
+            <Badge variant="secondary" className="h-auto rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">
+              {event.sold}% sold
+            </Badge>
           </div>
-        </div>
+        </CardContent>
       </Link>
-    </article>
+    </Card>
   )
 }
 
@@ -3078,34 +3086,43 @@ function EventMeta({ event, light = false }) {
 }
 
 function EmptyState({ icon: Icon, title, message, actionLabel, actionTo, onAction }) {
-  const actionClass = 'mt-5 inline-flex items-center justify-center rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800'
+  const actionClass = 'mt-5 h-11 rounded bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800'
 
   return (
-    <div className="rounded border border-dashed border-slate-300 bg-white p-8 text-center">
-      <span className="mx-auto grid h-12 w-12 place-items-center rounded bg-slate-100 text-slate-700">
-        <Icon size={22} />
-      </span>
-      <h2 className="mt-4 text-xl font-semibold text-slate-950">{title}</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{message}</p>
-      {actionTo && (
-        <Link to={actionTo} className={actionClass}>
-          {actionLabel}
-        </Link>
-      )}
-      {onAction && (
-        <button type="button" onClick={onAction} className={actionClass}>
-          {actionLabel}
-        </button>
-      )}
-    </div>
+    <Card className="rounded border border-dashed border-slate-300 bg-white py-0 text-center ring-0">
+      <CardContent className="p-8">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded bg-slate-100 text-slate-700">
+          <Icon size={22} />
+        </span>
+        <h2 className="mt-4 text-xl font-semibold text-slate-950">{title}</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{message}</p>
+        {actionTo && (
+          <Link to={actionTo} className={cn(buttonVariants(), actionClass)}>
+            {actionLabel}
+          </Link>
+        )}
+        {onAction && (
+          <Button type="button" onClick={onAction} className={actionClass}>
+            {actionLabel}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
 function LoadingPanel({ label }) {
   return (
-    <div className="rounded border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-500">
-      {label}
-    </div>
+    <Card className="rounded border border-slate-200 bg-white py-0 text-center ring-0">
+      <CardContent className="p-6" aria-busy="true" aria-live="polite">
+        <p className="text-sm font-semibold text-slate-500">{label}</p>
+        <div className="mx-auto mt-4 grid max-w-md gap-2">
+          <Skeleton className="mx-auto h-3 w-44" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="mx-auto h-3 w-2/3" />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -3145,15 +3162,17 @@ function SectionTitle({ kicker, title }) {
 
 function Stat({ icon: Icon, label, value }) {
   return (
-    <div className="rounded border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <span className="grid h-10 w-10 place-items-center rounded bg-rose-50 text-rose-600">
-          <Icon size={20} />
-        </span>
-      </div>
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-    </div>
+    <Card className="rounded border border-slate-200 bg-white py-0 ring-0">
+      <CardContent className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <span className="grid h-10 w-10 place-items-center rounded bg-rose-50 text-rose-600">
+            <Icon size={20} />
+          </span>
+        </div>
+        <p className="text-sm font-medium text-slate-500">{label}</p>
+        <p className="mt-1 text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
   )
 }
 
