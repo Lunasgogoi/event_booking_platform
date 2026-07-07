@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import api from '../services/api'
+import api, { setAuthToken } from '../services/api'
 import AuthContext from './auth-context'
 
 export function AuthProvider({ children }) {
@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
         const { data } = await api.get('/auth/me')
         setUser(data.user)
       } catch {
+        setAuthToken('')
         setUser(null)
       } finally {
         setIsBootstrapping(false)
@@ -23,18 +24,21 @@ export function AuthProvider({ children }) {
 
   async function login(credentials) {
     const { data } = await api.post('/auth/login', credentials)
+    setAuthToken(data.token)
     setUser(data.user)
     return data.user
   }
 
   async function register(payload) {
     const { data } = await api.post('/auth/register', payload)
+    setAuthToken(data.token)
     setUser(data.user)
     return data.user
   }
 
   async function logout() {
     await api.post('/auth/logout')
+    setAuthToken('')
     setUser(null)
   }
 
