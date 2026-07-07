@@ -13,12 +13,10 @@ import {
   Download,
   Edit3,
   Filter,
-  Heart,
   Info,
   ListChecks,
   LogOut,
   Mail,
-  MapPin,
   Menu,
   Moon,
   Plus,
@@ -44,7 +42,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,8 +49,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Sheet,
   SheetContent,
@@ -80,6 +75,19 @@ import {
   SummaryRow,
 } from '@/components/shared'
 import {
+  CategoryStrip,
+  EventGrid,
+  EventMeta,
+  EventPoster,
+  SearchPanel,
+} from '@/components/events'
+import {
+  AdminField,
+  AuthInput,
+  SeatLegend,
+  Select,
+} from '@/components/forms'
+import {
   authFormDefaults,
   categories,
   contactCategories,
@@ -88,7 +96,6 @@ import {
 } from '@/lib/constants'
 import {
   getCategoryFromSearchParams,
-  getCategoryPath,
   normalizeEvent,
 } from '@/lib/events'
 import {
@@ -2798,141 +2805,6 @@ function ConnectedAuthPage({ mode }) {
   )
 }
 
-function SearchPanel() {
-  const navigate = useNavigate()
-  const [query, setQuery] = useState('')
-
-  function submitSearch(event) {
-    event.preventDefault()
-
-    const params = new URLSearchParams()
-    if (query.trim()) {
-      params.set('search', query.trim())
-    }
-
-    navigate(params.toString() ? `/events?${params.toString()}` : '/events')
-  }
-
-  return (
-    <form onSubmit={submitSearch} className="grid gap-3 rounded border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_auto]">
-      <FieldIcon icon={Search}>
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search events"
-          className="h-auto w-full border-0 bg-transparent px-0 py-0 text-sm font-normal text-slate-950 outline-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-        />
-      </FieldIcon>
-      <Button type="submit" className="h-12 rounded bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
-        Search
-      </Button>
-    </form>
-  )
-}
-
-function CategoryStrip() {
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
-      {categories.map((category, index) => (
-        <Link
-          key={category}
-          to={getCategoryPath(category)}
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
-            index === 0
-              ? 'border-slate-950 bg-slate-950 text-white'
-              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950'
-          }`}
-        >
-          {category}
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-function EventGrid({ items }) {
-  return (
-    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      {items.map((event) => (
-        <EventCard key={event.id} event={event} />
-      ))}
-    </div>
-  )
-}
-
-function EventCard({ event }) {
-  return (
-    <Card className="gap-0 overflow-hidden rounded border border-slate-200 bg-white py-0 shadow-sm ring-0 transition hover:-translate-y-1 hover:shadow-md">
-      <Link to={`/events/${event.id}`} className="block">
-        <div className="relative h-48">
-          <EventPoster event={event} className="h-full w-full" />
-          <button
-            type="button"
-            onClick={(clickEvent) => {
-              clickEvent.preventDefault()
-              toast.success('Added to wishlist')
-            }}
-            className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded bg-white text-slate-700 shadow"
-            aria-label="Save event"
-          >
-            <Heart size={18} />
-          </button>
-          <Badge variant="secondary" className="absolute left-3 top-3 h-auto rounded bg-white px-2 py-1 text-xs font-semibold text-slate-950 shadow">
-            {event.category}
-          </Badge>
-        </div>
-        <CardContent className="p-4">
-          <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7">{event.title}</h3>
-          <EventMeta event={event} />
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-slate-500">
-              from <span className="font-semibold text-slate-950">INR {event.priceFrom.toLocaleString('en-IN')}</span>
-            </p>
-            <Badge variant="secondary" className="h-auto rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">
-              {event.sold}% sold
-            </Badge>
-          </div>
-        </CardContent>
-      </Link>
-    </Card>
-  )
-}
-
-function EventPoster({ event, className = '' }) {
-  const title = event?.title || 'Event'
-  const category = event?.category || 'Event'
-
-  if (event?.image) {
-    return <img src={event.image} alt={title} className={`${className} object-cover`} />
-  }
-
-  return (
-    <div className={`${className} grid place-items-center bg-slate-900 p-4 text-center text-white`}>
-      <div>
-        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded bg-white text-slate-950">
-          <Ticket size={22} />
-        </div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">{category}</p>
-        <p className="mt-1 line-clamp-2 text-sm font-semibold">{title}</p>
-      </div>
-    </div>
-  )
-}
-
-function EventMeta({ event, light = false }) {
-  const tone = light ? 'text-white/85' : 'text-slate-500'
-  return (
-    <div className={`mt-3 grid gap-2 text-sm font-semibold ${tone}`}>
-      <span className="inline-flex items-center gap-2">
-        <CalendarDays size={16} /> {format(event.date, 'EEE, dd MMM')} · {event.time}
-      </span>
-      <span className="inline-flex items-center gap-2">
-        <MapPin size={16} /> {event.venue}, {event.city}
-      </span>
-    </div>
-  )
-}
-
 function AuthVisual() {
   return (
     <div className="hidden bg-slate-950 p-8 text-white md:flex md:flex-col md:justify-between">
@@ -2944,66 +2816,6 @@ function AuthVisual() {
         <h2 className="mt-3 text-3xl font-semibold leading-tight">Manage access to bookings, events, and tickets.</h2>
       </div>
     </div>
-  )
-}
-
-function SeatLegend() {
-  const items = [
-    { label: 'Available', className: 'bg-slate-50 border-slate-300' },
-    { label: 'Selected', className: 'bg-rose-600 border-rose-600' },
-    { label: 'Unavailable', className: 'bg-slate-200 border-slate-300' },
-  ]
-
-  return (
-    <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
-      {items.map((item) => (
-        <span key={item.label} className="inline-flex items-center gap-2">
-          <span className={`h-3 w-3 rounded border ${item.className}`} />
-          {item.label}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-function Select({ value, onChange, options }) {
-  return (
-    <select value={value} onChange={onChange} className="min-h-12 rounded border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700">
-      {options.map((option) => (
-        <option key={option}>{option}</option>
-      ))}
-    </select>
-  )
-}
-
-function AdminField({ label, type = 'text', registration, required = false, min }) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-slate-700">
-      {label}
-      <input
-        {...registration}
-        type={type}
-        required={required}
-        min={min}
-        className="h-11 rounded border border-slate-200 bg-slate-50 px-3 outline-none focus:border-rose-500"
-      />
-    </label>
-  )
-}
-
-function AuthInput({ label, type = 'text', placeholder, minLength, registration }) {
-  return (
-    <Label className="grid gap-2 text-sm font-medium text-slate-700">
-      {label}
-      <Input
-        type={type}
-        placeholder={placeholder}
-        minLength={minLength}
-        {...registration}
-        required
-        className="h-12 rounded border border-slate-200 bg-slate-50 px-3 text-slate-950 outline-none focus:border-rose-500"
-      />
-    </Label>
   )
 }
 
