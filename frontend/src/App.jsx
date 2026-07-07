@@ -70,93 +70,29 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  authFormDefaults,
+  categories,
+  contactCategories,
+  eventFormDefaults,
+  supportEmail,
+} from '@/lib/constants'
+import {
+  getCategoryFromSearchParams,
+  getCategoryPath,
+  normalizeEvent,
+} from '@/lib/events'
+import {
+  formatDuration,
+  formatEventStatus,
+  formatINR,
+  formatOrganizerStatus,
+} from '@/lib/formatters'
+import { getInitialTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { useAuth } from './context/useAuth'
 import api from './services/api'
 import { getApiErrorMessage } from './services/api'
-
-const categories = ['All', 'Music', 'Comedy', 'Business', 'Sports', 'Food']
-const contactCategories = [
-  { value: 'booking', label: 'Booking issue' },
-  { value: 'event', label: 'Event information' },
-  { value: 'account', label: 'Account access' },
-  { value: 'payment', label: 'Payment question' },
-  { value: 'organizer', label: 'Organizer support' },
-  { value: 'other', label: 'Other' },
-]
-const supportEmail = 'support@ticketo.events'
-
-function getCategoryPath(category) {
-  return category === 'All' ? '/events' : `/events?category=${encodeURIComponent(category)}`
-}
-
-function getCategoryFromSearchParams(searchParams) {
-  const category = searchParams.get('category')
-  return categories.includes(category) ? category : 'All'
-}
-
-const eventFormDefaults = {
-  title: '',
-  description: '',
-  category: 'Music',
-  venueName: '',
-  address: '',
-  city: '',
-  startsAt: '',
-  priceFrom: '',
-  totalSeats: '',
-  status: 'draft',
-  posterFile: null,
-}
-
-const authFormDefaults = {
-  name: '',
-  email: '',
-  password: '',
-}
-
-function normalizeEvent(event) {
-  if (event.date) {
-    return event
-  }
-
-  const startsAt = event.startsAt ? new Date(event.startsAt) : new Date()
-  const totalSeats = event.totalSeats || 1
-  const availableSeats = event.availableSeats ?? totalSeats
-  const sold = Math.max(0, Math.min(100, Math.round(((totalSeats - availableSeats) / totalSeats) * 100)))
-
-  return {
-    id: event.slug || event._id,
-    mongoId: event._id,
-    title: event.title,
-    description: event.description,
-    category: event.category,
-    city: event.venue?.city || 'Online',
-    venue: event.venue?.name || 'Venue to be announced',
-    address: event.venue?.address,
-    date: startsAt,
-    time: format(startsAt, 'h:mm a'),
-    priceFrom: Number(event.priceFrom || 0),
-    sold,
-    image: event.poster?.url || '',
-    seats: event.seats || [],
-    totalSeats,
-    availableSeats,
-    status: event.status,
-    raw: event,
-  }
-}
-
-function formatINR(value) {
-  return `INR ${Number(value || 0).toLocaleString('en-IN')}`
-}
-
-function formatDuration(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}
 
 const RAZORPAY_CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js'
 
@@ -208,34 +144,6 @@ function getAvatarUrl(user) {
   return user?.avatar?.url || user?.avatarUrl || ''
 }
 
-function formatOrganizerStatus(status) {
-  const labels = {
-    none: 'Not requested',
-    pending: 'Pending review',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    suspended: 'Suspended',
-  }
-
-  return labels[status || 'none'] || 'Not requested'
-}
-
-function formatEventStatus(status) {
-  const labels = {
-    draft: 'Draft',
-    submitted: 'Submitted',
-    under_review: 'Under review',
-    changes_requested: 'Changes requested',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    published: 'Published',
-    cancelled: 'Cancelled',
-    completed: 'Completed',
-  }
-
-  return labels[status] || status
-}
-
 function getOrganizerLink(user) {
   if (user?.role === 'organizer') {
     return { to: '/organizer/events', label: 'Organizer dashboard' }
@@ -259,16 +167,6 @@ function getOrganizerLink(user) {
 
 function getCurrentTimestamp() {
   return Date.now()
-}
-
-function getInitialTheme() {
-  const savedTheme = window.localStorage.getItem('ticketo-theme')
-
-  if (savedTheme === 'dark' || savedTheme === 'light') {
-    return savedTheme
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 function App() {
