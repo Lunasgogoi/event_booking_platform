@@ -20,6 +20,7 @@ const OrganizerApplyPage = lazyPage(() => import('@/pages/OrganizerApplyPage'), 
 const AboutPage = lazyPage(() => import('@/pages/StaticPages'), 'AboutPage')
 const ContactPage = lazyPage(() => import('@/pages/StaticPages'), 'ContactPage')
 const AdminDashboardPage = lazyPage(() => import('@/pages/admin/AdminDashboardPage'), 'AdminDashboardPage')
+const AdminOrganizersPage = lazyPage(() => import('@/pages/admin/AdminOrganizersPage'), 'AdminOrganizersPage')
 const ManageEventsPage = lazyPage(() => import('@/pages/admin/ManageEventsPage'), 'ManageEventsPage')
 const ConnectedAuthPage = lazyPage(() => import('@/pages/AuthPage'), 'ConnectedAuthPage')
 
@@ -62,6 +63,14 @@ export function AppRoutes() {
           element={(
             <AdminRoute>
               <ManageEventsPage />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/organizers"
+          element={(
+            <AdminRoute>
+              <AdminOrganizersPage />
             </AdminRoute>
           )}
         />

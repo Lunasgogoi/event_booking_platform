@@ -4,6 +4,7 @@ const {
   getDashboardStats,
   getOrganizerRequests,
   getUsers,
+  removeOrganizerAccess,
   reviewOrganizerRequest,
   updateContactMessageStatus,
   updateUserRole,
@@ -12,7 +13,12 @@ const {
 const { protect } = require('../middlewares/authMiddleware')
 const { restrictTo } = require('../middlewares/roleMiddleware')
 const validateRequest = require('../middlewares/validateRequest')
-const { reviewOrganizerRequestSchema, updateUserRoleSchema, updateUserStatusSchema } = require('../validators/adminValidator')
+const {
+  removeOrganizerAccessSchema,
+  reviewOrganizerRequestSchema,
+  updateUserRoleSchema,
+  updateUserStatusSchema,
+} = require('../validators/adminValidator')
 const { updateContactMessageStatusSchema } = require('../validators/contactValidator')
 
 const router = express.Router()
@@ -35,6 +41,13 @@ router.patch(
   updateContactMessageStatus,
 )
 router.get('/users', protect, restrictTo('admin'), getUsers)
+router.patch(
+  '/users/:userId/remove-organizer',
+  protect,
+  restrictTo('admin'),
+  validateRequest(removeOrganizerAccessSchema),
+  removeOrganizerAccess,
+)
 router.patch('/users/:userId/role', protect, restrictTo('admin'), validateRequest(updateUserRoleSchema), updateUserRole)
 router.patch('/users/:userId/status', protect, restrictTo('admin'), validateRequest(updateUserStatusSchema), updateUserStatus)
 

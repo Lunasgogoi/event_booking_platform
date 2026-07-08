@@ -13,7 +13,12 @@ const reviewOrganizerRequestSchema = z.object({
   reviewNote: z.string().trim().max(1000).optional().default(''),
 })
 
+const removeOrganizerAccessSchema = z.object({
+  reviewNote: z.string().trim().max(1000).optional().default('Organizer access removed by admin.'),
+})
+
 module.exports = {
+  removeOrganizerAccessSchema,
   reviewOrganizerRequestSchema,
   updateUserRoleSchema,
   updateUserStatusSchema,

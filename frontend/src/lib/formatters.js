@@ -16,6 +16,7 @@ export function formatOrganizerStatus(status) {
     approved: 'Approved',
     rejected: 'Rejected',
     suspended: 'Suspended',
+    revoked: 'Revoked',
   }
 
   return labels[status || 'none'] || 'Not requested'

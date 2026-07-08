@@ -23,7 +23,6 @@ async function getDashboardStats(req, res, next) {
       bookingCount,
       activeUsers,
       eventCounts,
-      fillRateResult,
       eventPerformance,
       recentBookings,
       newSupportMessages,
@@ -37,15 +36,6 @@ async function getDashboardStats(req, res, next) {
       Booking.countDocuments({ status: 'confirmed' }),
       User.countDocuments({ isActive: true }),
       Event.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-      Event.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalSeats: { $sum: '$totalSeats' },
-            availableSeats: { $sum: '$availableSeats' },
-          },
-        },
-      ]),
       Booking.aggregate([
         { $match: { status: 'confirmed' } },
         {
@@ -97,10 +87,6 @@ async function getDashboardStats(req, res, next) {
       }),
       {},
     )
-    const fillTotals = fillRateResult[0] || { totalSeats: 0, availableSeats: 0 }
-    const bookedSeats = fillTotals.totalSeats - fillTotals.availableSeats
-    const fillRate = fillTotals.totalSeats ? Math.round((bookedSeats / fillTotals.totalSeats) * 100) : 0
-
     res.status(200).json({
       success: true,
       message: 'Dashboard stats fetched successfully',
@@ -108,7 +94,6 @@ async function getDashboardStats(req, res, next) {
         revenue: totalRevenueResult[0]?.total || 0,
         bookings: bookingCount,
         activeUsers,
-        fillRate,
         events: {
           total: Object.values(counts).reduce((total, count) => total + count, 0),
           draft: counts.draft || 0,
@@ -154,7 +139,7 @@ async function getDashboardStats(req, res, next) {
 async function getOrganizerRequests(req, res, next) {
   try {
     const { status = 'pending', page = 1, limit = 20 } = req.query
-    const allowedStatuses = ['pending', 'approved', 'rejected', 'suspended']
+    const allowedStatuses = ['pending', 'approved', 'rejected', 'suspended', 'revoked']
     const query = {}
 
     if (allowedStatuses.includes(status)) {
@@ -235,6 +220,53 @@ async function reviewOrganizerRequest(req, res, next) {
     res.status(200).json({
       success: true,
       message: 'Organizer request reviewed successfully',
+      user,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function removeOrganizerAccess(req, res, next) {
+  try {
+    const { userId } = req.params
+    const { reviewNote } = req.body
+    ensureObjectId(userId)
+
+    const user = await User.findById(userId)
+    if (!user) {
+      throw new ApiError(404, 'User not found')
+    }
+
+    if (user.role === 'admin') {
+      throw new ApiError(400, 'Admin accounts do not use organizer access')
+    }
+
+    const currentStatus = user.organizerProfile?.status || 'none'
+    if (user.role !== 'organizer' && currentStatus !== 'approved') {
+      throw new ApiError(400, 'User does not have active organizer access')
+    }
+
+    user.role = 'user'
+    user.organizerProfile = {
+      ...user.organizerProfile,
+      status: 'revoked',
+      reviewedAt: new Date(),
+      reviewedBy: req.user._id,
+      reviewNote,
+    }
+    await user.save({ validateBeforeSave: false })
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Organizer access removed',
+      text: `Hi ${user.name}, your organizer access has been removed.${reviewNote ? ` Note: ${reviewNote}` : ''}`,
+      html: `<p>Hi ${user.name},</p><p>Your organizer access has been removed.</p>${reviewNote ? `<p>${reviewNote}</p>` : ''}`,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Organizer access removed successfully',
       user,
     })
   } catch (error) {
@@ -402,6 +434,7 @@ module.exports = {
   getDashboardStats,
   getOrganizerRequests,
   getUsers,
+  removeOrganizerAccess,
   reviewOrganizerRequest,
   updateContactMessageStatus,
   updateUserRole,

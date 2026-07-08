@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
     organizerProfile: {
       status: {
         type: String,
-        enum: ['none', 'pending', 'approved', 'rejected', 'suspended'],
+        enum: ['none', 'pending', 'approved', 'rejected', 'suspended', 'revoked'],
         default: 'none',
         index: true,
       },

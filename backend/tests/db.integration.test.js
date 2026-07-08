@@ -356,6 +356,36 @@ test('organizer access request can be approved by admin', { timeout: 30000 }, as
   assert.equal(approveResponse.status, 200)
   assert.equal(approveResponse.body.user.role, 'organizer')
   assert.equal(approveResponse.body.user.organizerProfile.status, 'approved')
+
+  const activeListResponse = await api('GET', '/api/admin/organizer-requests?status=approved', {
+    headers: bearer(admin._id),
+  })
+
+  assert.equal(activeListResponse.status, 200)
+  assert.equal(activeListResponse.body.organizerRequests.length, 1)
+
+  const removeResponse = await api('PATCH', `/api/admin/users/${user._id}/remove-organizer`, {
+    headers: bearer(admin._id),
+    body: {
+      reviewNote: 'Please re-verify your organizer details.',
+    },
+  })
+
+  assert.equal(removeResponse.status, 200)
+  assert.equal(removeResponse.body.user.role, 'user')
+  assert.equal(removeResponse.body.user.organizerProfile.status, 'revoked')
+
+  const reapplyResponse = await api('POST', '/api/auth/organizer-request', {
+    headers: bearer(user._id),
+    body: {
+      organizationName: 'Small Hall Collective',
+      phone: '+91 9876543210',
+      message: 'Reapplying with current details.',
+    },
+  })
+
+  assert.equal(reapplyResponse.status, 200)
+  assert.equal(reapplyResponse.body.user.organizerProfile.status, 'pending')
 })
 
 test('organizers can manage only their own draft events', { timeout: 30000 }, async (t) => {

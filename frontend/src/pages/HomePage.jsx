@@ -47,23 +47,23 @@ export function HomePage() {
             <CategoryStrip />
           </div>
 
-          <div className="relative min-h-[420px] overflow-hidden rounded-lg border border-border bg-foreground">
+          <div className="relative min-h-[420px] overflow-hidden rounded-xl bg-foreground shadow-2xl shadow-black/20">
             {featuredEvent ? (
               <>
-                <EventPoster event={featuredEvent} className="h-full min-h-[420px] w-full opacity-80" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                <EventPoster event={featuredEvent} className="h-full min-h-[420px] w-full" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-5 text-white sm:p-7">
                   <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="rounded bg-white px-3 py-1 text-xs font-semibold text-black">Featured</span>
-                    <span className="rounded bg-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-950">
+                    <span className="rounded-md bg-[rgba(255,255,255,0.88)] px-3 py-1 text-xs font-semibold text-neutral-950 shadow-sm backdrop-blur-sm">Featured</span>
+                    <span className="rounded-md bg-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-950 shadow-sm">
                       {featuredEvent.sold}% sold
                     </span>
                   </div>
-                  <h2 className="text-2xl font-semibold sm:text-3xl">{featuredEvent.title}</h2>
+                  <h2 className="text-2xl font-semibold drop-shadow-sm sm:text-3xl">{featuredEvent.title}</h2>
                   <EventMeta event={featuredEvent} light />
                   <Link
                     to={`/events/${featuredEvent.id}`}
-                    className={cn(buttonVariants({ variant: 'secondary' }), 'mt-5 px-5 py-3 text-sm font-semibold')}
+                    className={cn(buttonVariants({ variant: 'secondary' }), 'mt-5 px-5 py-3 text-sm font-semibold shadow-lg shadow-black/20')}
                   >
                     <Ticket size={18} /> Book now
                   </Link>

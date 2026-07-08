@@ -193,7 +193,7 @@ export function OrganizerApplyPage() {
               disabled={isSubmitting}
               className="w-fit px-4 py-3 text-sm font-semibold"
             >
-              {isSubmitting ? 'Submitting...' : organizerStatus === 'rejected' ? 'Apply again' : 'Request organizer access'}
+              {isSubmitting ? 'Submitting...' : ['rejected', 'revoked'].includes(organizerStatus) ? 'Apply again' : 'Request organizer access'}
             </Button>
           </form>
         )}

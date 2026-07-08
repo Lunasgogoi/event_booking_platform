@@ -63,6 +63,7 @@ Auth endpoints:
 - `PATCH /api/auth/me`
 - `PATCH /api/auth/avatar`
 - `PATCH /api/auth/password`
+- `POST /api/auth/organizer-request`
 
 Event endpoints:
 
@@ -96,7 +97,10 @@ Contact endpoints:
 Admin endpoints:
 
 - `GET /api/admin/dashboard`
+- `GET /api/admin/organizer-requests`
+- `PATCH /api/admin/organizer-requests/:userId/status`
 - `GET /api/admin/users`
+- `PATCH /api/admin/users/:userId/remove-organizer`
 - `PATCH /api/admin/users/:userId/role`
 - `PATCH /api/admin/users/:userId/status`
 - `GET /api/admin/contact-messages`

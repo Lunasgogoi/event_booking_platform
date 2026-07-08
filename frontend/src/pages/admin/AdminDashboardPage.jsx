@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { BarChart3, CheckCircle2, ListChecks, Mail, Ticket, Users } from 'lucide-react'
+import { BarChart3, ListChecks, Mail, Ticket, Users } from 'lucide-react'
 import { SectionTitle, Stat } from '@/components/shared'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { formatINR, formatOrganizerStatus } from '@/lib/formatters'
+import { formatINR } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import api, { getApiErrorMessage } from '@/services/api'
 
 export function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [supportMessages, setSupportMessages] = useState([])
-  const [organizerRequests, setOrganizerRequests] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -21,14 +20,12 @@ export function AdminDashboardPage() {
     setLoadError('')
 
     try {
-      const [{ data: dashboardData }, { data: contactData }, { data: organizerData }] = await Promise.all([
+      const [{ data: dashboardData }, { data: contactData }] = await Promise.all([
         api.get('/admin/dashboard'),
         api.get('/admin/contact-messages', { params: { limit: 5 } }),
-        api.get('/admin/organizer-requests', { params: { status: 'pending', limit: 5 } }),
       ])
       setDashboard(dashboardData)
       setSupportMessages(contactData.contactMessages || [])
-      setOrganizerRequests(organizerData.organizerRequests || [])
     } catch (error) {
       const message = getApiErrorMessage(error)
       setLoadError(message)
@@ -50,17 +47,6 @@ export function AdminDashboardPage() {
         current.map((message) => (message._id === messageId ? data.contactMessage : message)),
       )
       toast.success('Support message updated')
-    } catch (error) {
-      toast.error(getApiErrorMessage(error))
-    }
-  }
-
-  async function reviewOrganizerRequest(userId, status) {
-    try {
-      await api.patch(`/admin/organizer-requests/${userId}/status`, { status })
-      setOrganizerRequests((current) => current.filter((request) => request._id !== userId))
-      toast.success(status === 'approved' ? 'Organizer approved' : 'Organizer rejected')
-      loadDashboard()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
     }
@@ -95,13 +81,11 @@ export function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         <Stat label="Revenue" value={stats ? formatINR(stats.revenue) : '-'} icon={BarChart3} />
         <Stat label="Bookings" value={stats ? stats.bookings.toLocaleString('en-IN') : '-'} icon={Ticket} />
         <Stat label="Active users" value={stats ? stats.activeUsers.toLocaleString('en-IN') : '-'} icon={Users} />
-        <Stat label="Fill rate" value={stats ? `${stats.fillRate}%` : '-'} icon={CheckCircle2} />
         <Stat label="New support" value={stats ? (stats.supportMessages?.new || 0).toLocaleString('en-IN') : '-'} icon={Mail} />
-        <Stat label="Organizer requests" value={stats ? (stats.organizerRequests?.pending || 0).toLocaleString('en-IN') : '-'} icon={Users} />
         <Stat label="Event reviews" value={stats ? (stats.eventReviews?.pending || 0).toLocaleString('en-IN') : '-'} icon={ListChecks} />
       </div>
 
@@ -130,61 +114,6 @@ export function AdminDashboardPage() {
         </section>
 
         <div className="grid gap-5">
-          <section className="rounded-lg border border-border bg-card p-5">
-            <h2 className="text-xl font-semibold">Organizer requests</h2>
-            <div className="mt-5 space-y-4">
-              {!isLoading && organizerRequests.length === 0 && (
-                <p className="text-sm font-semibold text-muted-foreground">No pending organizer requests.</p>
-              )}
-              {organizerRequests.map((request) => (
-                <div key={request._id} className="rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-foreground">
-                        {request.organizerProfile?.organizationName || request.name}
-                      </p>
-                      <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
-                        {request.name} - {request.email}
-                      </p>
-                    </div>
-                    <Badge variant="secondary" className="h-auto px-2 py-1 text-xs font-semibold">
-                      {formatOrganizerStatus(request.organizerProfile?.status)}
-                    </Badge>
-                  </div>
-                  {request.organizerProfile?.message && (
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">{request.organizerProfile.message}</p>
-                  )}
-                  <div className="mt-3 grid gap-1 text-xs font-semibold text-muted-foreground">
-                    {request.organizerProfile?.contactEmail && <span>{request.organizerProfile.contactEmail}</span>}
-                    {request.organizerProfile?.city && <span>{request.organizerProfile.city}</span>}
-                    {request.organizerProfile?.website && <span>{request.organizerProfile.website}</span>}
-                    {request.organizerProfile?.eventTypes?.length > 0 && (
-                      <span>{request.organizerProfile.eventTypes.join(', ')}</span>
-                    )}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => reviewOrganizerRequest(request._id, 'approved')}
-                      className="border-emerald-500/30 px-3 py-2 text-xs font-semibold text-emerald-700"
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => reviewOrganizerRequest(request._id, 'rejected')}
-                      className="px-3 py-2 text-xs font-semibold"
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
           <section className="rounded-lg border border-border bg-card p-5">
             <h2 className="text-xl font-semibold">Support queue</h2>
             <div className="mt-5 space-y-4">

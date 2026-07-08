@@ -401,7 +401,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
                 <TableRow key={event.id}>
                   <TableCell className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <EventPoster event={event} className="h-12 w-16 rounded" />
+                      <EventPoster event={event} compact className="h-12 w-16 rounded" />
                       <div>
                         <p className="font-semibold">{event.title}</p>
                         <p className="text-xs text-muted-foreground">{event.category}</p>
@@ -492,7 +492,6 @@ export function ManageEventsPage({ scope = 'admin' }) {
                             Changes
                           </Button>
                           <Button
-                            variant="outline"
                             type="button"
                             variant="destructive"
                             onClick={() => reviewEvent(event.id, 'rejected')}
@@ -514,7 +513,6 @@ export function ManageEventsPage({ scope = 'admin' }) {
                       )}
                       {event.canDelete && (
                         <Button
-                          variant="outline"
                           type="button"
                           variant="destructive"
                           onClick={() => setDeleteTarget(event.raw)}

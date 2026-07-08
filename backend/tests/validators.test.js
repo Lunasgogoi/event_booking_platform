@@ -7,7 +7,11 @@ const {
   requestOrganizerAccessSchema,
   updateProfileSchema,
 } = require('../src/validators/authValidator')
-const { reviewOrganizerRequestSchema, updateUserRoleSchema } = require('../src/validators/adminValidator')
+const {
+  removeOrganizerAccessSchema,
+  reviewOrganizerRequestSchema,
+  updateUserRoleSchema,
+} = require('../src/validators/adminValidator')
 const { createBookingSchema, seatLockSchema, verifyPaymentSchema } = require('../src/validators/bookingValidator')
 const { createContactMessageSchema, updateContactMessageStatusSchema } = require('../src/validators/contactValidator')
 const { createEventSchema, reviewEventSchema } = require('../src/validators/eventValidator')
@@ -83,6 +87,14 @@ test('organizer review schema rejects pending status', () => {
   })
 
   assert.equal(result.success, false)
+})
+
+test('organizer removal schema accepts an optional note', () => {
+  const result = removeOrganizerAccessSchema.safeParse({
+    reviewNote: 'Needs to re-verify organization details.',
+  })
+
+  assert.equal(result.success, true)
 })
 
 test('user role schema accepts organizer role', () => {

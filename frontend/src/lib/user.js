@@ -17,7 +17,7 @@ export function getOrganizerLink(user) {
     return { to: '/organizer/apply', label: 'Organizer request' }
   }
 
-  if (status === 'rejected') {
+  if (['rejected', 'revoked'].includes(status)) {
     return { to: '/organizer/apply', label: 'Apply again' }
   }
 

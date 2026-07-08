@@ -30,6 +30,7 @@ export function Shell({ children, theme, onToggleTheme }) {
     { to: '/bookings', label: 'My bookings' },
     user?.role !== 'admin' ? organizerLink : null,
     user?.role === 'admin' ? { to: '/admin', label: 'Admin' } : null,
+    user?.role === 'admin' ? { to: '/admin/organizers', label: 'Organizers' } : null,
   ].filter(Boolean)
 
   async function handleLogout() {
@@ -58,6 +59,7 @@ export function Shell({ children, theme, onToggleTheme }) {
               <NavLink
                 key={link.to}
                 to={link.to}
+                end={link.to === '/admin'}
                 className={({ isActive }) =>
                   `rounded-md px-3 py-2 text-sm font-semibold transition ${
                     isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -112,6 +114,7 @@ export function Shell({ children, theme, onToggleTheme }) {
                   <NavLink
                     key={link.to}
                     to={link.to}
+                    end={link.to === '/admin'}
                     onClick={() => setOpen(false)}
                     className="rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
