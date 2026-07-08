@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Event Booking Platform",
-    "description": "Postman collection for the MERN Event Booking Platform backend APIs.",
+    "description": "Postman collection for the MERN Event Booking Platform backend APIs. Requests are grouped by public, authenticated user, organizer, and admin workflows.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -40,7 +40,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.token) pm.environment.set('token', json.token);"
+                  "if (json.token) pm.environment.set('token', json.token);",
+                  "if (json.user?._id) pm.environment.set('userId', json.user._id);"
                 ]
               }
             }
@@ -69,7 +70,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.token) pm.environment.set('token', json.token);"
+                  "if (json.token) pm.environment.set('token', json.token);",
+                  "if (json.user?._id) pm.environment.set('userId', json.user._id);"
                 ]
               }
             }
@@ -112,6 +114,23 @@
               "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@example.com\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Request Organizer Access",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationName\": \"Ticketo Experiences\",\n  \"contactEmail\": \"organizer@example.com\",\n  \"phone\": \"+91 9876543210\",\n  \"city\": \"Mumbai\",\n  \"website\": \"https://example.com\",\n  \"eventTypes\": [\"Music\", \"Business\"],\n  \"message\": \"We host curated city events and want to publish on the platform.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/organizer-request"
           }
         },
         {
@@ -164,10 +183,23 @@
       "item": [
         {
           "name": "List Events",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.events?.[0]?._id) pm.environment.set('eventId', json.events[0]._id);",
+                  "if (json.events?.[0]?.slug) pm.environment.set('eventSlug', json.events[0].slug);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/events?limit=12"
+            "url": "{{baseUrl}}/api/events?page=1&limit=12"
           }
         },
         {
@@ -175,7 +207,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/events?search=music&category=Music&city=Mumbai"
+            "url": "{{baseUrl}}/api/events?search=music&category=Music&city=Mumbai&page=1&limit=12"
           }
         },
         {
@@ -231,18 +263,294 @@
       ]
     },
     {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Lock Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumber\": \"{{seatNumber}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings/lock-seat"
+          }
+        },
+        {
+          "name": "Release Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumber\": \"{{seatNumber}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings/release-seat"
+          }
+        },
+        {
+          "name": "Create Payment Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.payment?.orderId) pm.environment.set('razorpayOrderId', json.payment.orderId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumbers\": [\"{{seatNumber}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings"
+          }
+        },
+        {
+          "name": "Verify Payment And Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.booking?._id) pm.environment.set('bookingId', json.booking._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumbers\": [\"{{seatNumber}}\"],\n  \"razorpay_order_id\": \"{{razorpayOrderId}}\",\n  \"razorpay_payment_id\": \"{{razorpayPaymentId}}\",\n  \"razorpay_signature\": \"{{razorpaySignature}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings/verify-payment"
+          }
+        },
+        {
+          "name": "My Bookings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.bookings?.[0]?._id) pm.environment.set('bookingId', json.bookings[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/my?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/cancel"
+          }
+        },
+        {
+          "name": "Remove Booking From My Bookings",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organizer Events",
+      "item": [
+        {
+          "name": "Manage My Events",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.events?.[0]?._id) pm.environment.set('organizerEventId', json.events[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/organizer/manage?page=1&limit=50"
+          }
+        },
+        {
+          "name": "Create Organizer Draft Event",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.event?._id) pm.environment.set('organizerEventId', json.event._id);",
+                  "if (json.event?._id) pm.environment.set('eventId', json.event._id);",
+                  "if (json.event?.slug) pm.environment.set('eventSlug', json.event.slug);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Founder Mixer 2026\",\n  \"description\": \"A curated networking evening for founders, operators, and early-stage investors with reserved seating.\",\n  \"category\": \"Business\",\n  \"venue\": {\n    \"name\": \"The Executive Centre\",\n    \"address\": \"Bandra Kurla Complex\",\n    \"city\": \"Mumbai\"\n  },\n  \"startsAt\": \"2026-08-20T14:30:00.000Z\",\n  \"endsAt\": \"2026-08-20T17:30:00.000Z\",\n  \"priceFrom\": 1499,\n  \"totalSeats\": 30,\n  \"status\": \"draft\"\n}"
+            },
+            "url": "{{baseUrl}}/api/events/organizer"
+          }
+        },
+        {
+          "name": "Update Organizer Draft Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Founder Mixer 2026 Updated\",\n  \"priceFrom\": 1599\n}"
+            },
+            "url": "{{baseUrl}}/api/events/organizer/{{organizerEventId}}"
+          }
+        },
+        {
+          "name": "Submit Organizer Event For Review",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/organizer/{{organizerEventId}}/submit"
+          }
+        },
+        {
+          "name": "Publish Approved Organizer Event",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/organizer/{{organizerEventId}}/publish"
+          }
+        },
+        {
+          "name": "Delete Organizer Draft Event",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/organizer/{{organizerEventId}}"
+          }
+        }
+      ]
+    },
+    {
       "name": "Admin Events",
       "item": [
         {
           "name": "Manage Events",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.events?.[0]?._id) pm.environment.set('eventId', json.events[0]._id);",
+                  "if (json.events?.[0]?.slug) pm.environment.set('eventSlug', json.events[0].slug);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/events/admin/manage"
+            "url": "{{baseUrl}}/api/events/admin/manage?page=1&limit=50"
+          }
+        },
+        {
+          "name": "Review Event Queue",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.events?.[0]?._id) pm.environment.set('organizerEventId', json.events[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/events/admin/review?status=submitted&page=1&limit=50"
           }
         },
         {
           "name": "Upload Event Poster",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.poster?.url) pm.environment.set('posterUrl', json.poster.url);",
+                  "if (json.poster?.publicId) pm.environment.set('posterPublicId', json.poster.publicId);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [],
@@ -284,7 +592,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Neon Nights Live\",\n  \"description\": \"A high-energy live music event with curated performances and reserved seating.\",\n  \"category\": \"Music\",\n  \"venue\": {\n    \"name\": \"Jio World Garden\",\n    \"address\": \"Bandra Kurla Complex\",\n    \"city\": \"Mumbai\"\n  },\n  \"startsAt\": \"2026-08-20T14:30:00.000Z\",\n  \"priceFrom\": 999,\n  \"totalSeats\": 30,\n  \"status\": \"draft\"\n}"
+              "raw": "{\n  \"title\": \"Neon Nights Live\",\n  \"description\": \"A high-energy live music event with curated performances and reserved seating.\",\n  \"category\": \"Music\",\n  \"venue\": {\n    \"name\": \"Jio World Garden\",\n    \"address\": \"Bandra Kurla Complex\",\n    \"city\": \"Mumbai\"\n  },\n  \"startsAt\": \"2026-08-20T14:30:00.000Z\",\n  \"endsAt\": \"2026-08-20T17:30:00.000Z\",\n  \"priceFrom\": 999,\n  \"totalSeats\": 30,\n  \"status\": \"draft\"\n}"
             },
             "url": "{{baseUrl}}/api/events"
           }
@@ -304,6 +612,23 @@
               "raw": "{\n  \"title\": \"Neon Nights Live Updated\",\n  \"priceFrom\": 1199\n}"
             },
             "url": "{{baseUrl}}/api/events/{{eventId}}"
+          }
+        },
+        {
+          "name": "Review Organizer Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"reviewNote\": \"Approved for publishing.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/events/{{organizerEventId}}/review"
           }
         },
         {
@@ -333,90 +658,6 @@
       ]
     },
     {
-      "name": "Bookings",
-      "item": [
-        {
-          "name": "Lock Seat",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumber\": \"{{seatNumber}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/bookings/lock-seat"
-          }
-        },
-        {
-          "name": "Release Seat",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumber\": \"{{seatNumber}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/bookings/release-seat"
-          }
-        },
-        {
-          "name": "Create Booking",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json.booking?._id) pm.environment.set('bookingId', json.booking._id);"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"seatNumbers\": [\"{{seatNumber}}\"]\n}"
-            },
-            "url": "{{baseUrl}}/api/bookings"
-          }
-        },
-        {
-          "name": "My Bookings",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/bookings/my"
-          }
-        },
-        {
-          "name": "Cancel Booking",
-          "request": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/cancel"
-          }
-        }
-      ]
-    },
-    {
       "name": "Admin",
       "item": [
         {
@@ -425,6 +666,43 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/admin/dashboard"
+          }
+        },
+        {
+          "name": "List Organizer Requests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.organizerRequests?.[0]?._id) pm.environment.set('organizerUserId', json.organizerRequests[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/organizer-requests?status=pending&page=1&limit=20"
+          }
+        },
+        {
+          "name": "Review Organizer Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"reviewNote\": \"Approved to publish events.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/organizer-requests/{{organizerUserId}}/status"
           }
         },
         {
@@ -444,7 +722,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/admin/contact-messages?page=1&limit=20"
+            "url": "{{baseUrl}}/api/admin/contact-messages?status=new&page=1&limit=20"
           }
         },
         {
@@ -485,6 +763,14 @@
           }
         },
         {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/users?search=user&role=user&status=active&page=1&limit=20"
+          }
+        },
+        {
           "name": "Update User Role",
           "request": {
             "method": "PATCH",
@@ -516,6 +802,23 @@
               "raw": "{\n  \"isActive\": true\n}"
             },
             "url": "{{baseUrl}}/api/admin/users/{{userId}}/status"
+          }
+        },
+        {
+          "name": "Remove Organizer Access",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewNote\": \"Organizer access removed by admin.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/users/{{organizerUserId}}/remove-organizer"
           }
         }
       ]
