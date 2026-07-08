@@ -4,6 +4,7 @@ const {
   createBookingOrder,
   getMyBookings,
   lockSeatForBooking,
+  removeMyBooking,
   releaseSeatLock,
   verifyPaymentAndCreateBooking,
 } = require('../controllers/bookingController')
@@ -19,6 +20,7 @@ router.post('/release-seat', protect, validateRequest(seatLockSchema), releaseSe
 router.post('/', protect, bookingLimiter, validateRequest(createBookingSchema), createBookingOrder)
 router.post('/verify-payment', protect, bookingLimiter, validateRequest(verifyPaymentSchema), verifyPaymentAndCreateBooking)
 router.get('/my', protect, getMyBookings)
+router.delete('/:bookingId', protect, removeMyBooking)
 router.patch('/:bookingId/cancel', protect, cancelBooking)
 
 module.exports = router

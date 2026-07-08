@@ -424,13 +424,17 @@ async function getMyBookings(req, res, next) {
     const { page = 1, limit = 20 } = req.query
     const pageNumber = Math.max(Number(page), 1)
     const pageSize = Math.min(Math.max(Number(limit), 1), 100)
+    const query = {
+      user: req.user._id,
+      hiddenFromUserAt: { $exists: false },
+    }
     const [bookings, total] = await Promise.all([
-      Booking.find({ user: req.user._id })
+      Booking.find(query)
         .sort({ createdAt: -1 })
         .skip((pageNumber - 1) * pageSize)
         .limit(pageSize)
         .populate('event'),
-      Booking.countDocuments({ user: req.user._id }),
+      Booking.countDocuments(query),
     ])
 
     res.status(200).json({
@@ -443,6 +447,43 @@ async function getMyBookings(req, res, next) {
         total,
         pages: Math.ceil(total / pageSize),
       },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function removeMyBooking(req, res, next) {
+  try {
+    const { bookingId } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      throw new ApiError(400, 'Invalid booking id')
+    }
+
+    const booking = await Booking.findOne({ _id: bookingId, user: req.user._id }).populate('event')
+    if (!booking) {
+      throw new ApiError(404, 'Booking not found')
+    }
+
+    const now = new Date()
+    const eventUnavailable = !booking.event
+    const eventDateHasPassed = Boolean(booking.event?.startsAt && booking.event.startsAt <= now)
+    const eventIsClosed = ['cancelled', 'completed'].includes(booking.event?.status)
+    const bookingIsClosed = ['cancelled', 'expired'].includes(booking.status)
+
+    if (!bookingIsClosed && !eventUnavailable && !eventIsClosed && !eventDateHasPassed) {
+      throw new ApiError(400, 'Only cancelled or past event bookings can be removed')
+    }
+
+    if (!booking.hiddenFromUserAt) {
+      booking.hiddenFromUserAt = now
+      await booking.save()
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Booking removed from My bookings',
     })
   } catch (error) {
     next(error)
@@ -515,6 +556,7 @@ module.exports = {
   createBookingOrder,
   getMyBookings,
   lockSeatForBooking,
+  removeMyBooking,
   releaseSeatLock,
   verifyPaymentAndCreateBooking,
 }

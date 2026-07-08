@@ -11,6 +11,7 @@ export function AdminOrganizersPage() {
   const [activeOrganizers, setActiveOrganizers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [pendingAction, setPendingAction] = useState(null)
 
   async function loadOrganizers() {
     setIsLoading(true)
@@ -38,6 +39,7 @@ export function AdminOrganizersPage() {
   }, [])
 
   async function reviewOrganizerRequest(userId, status) {
+    setPendingAction({ userId, action: status })
     try {
       await api.patch(`/admin/organizer-requests/${userId}/status`, { status })
       setOrganizerRequests((current) => current.filter((request) => request._id !== userId))
@@ -45,6 +47,8 @@ export function AdminOrganizersPage() {
       loadOrganizers()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -53,6 +57,7 @@ export function AdminOrganizersPage() {
       return
     }
 
+    setPendingAction({ userId, action: 'remove' })
     try {
       await api.patch(`/admin/users/${userId}/remove-organizer`, {
         reviewNote: 'Organizer access removed by admin.',
@@ -62,7 +67,17 @@ export function AdminOrganizersPage() {
       loadOrganizers()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
+    } finally {
+      setPendingAction(null)
     }
+  }
+
+  function isUserActionPending(userId, action) {
+    return pendingAction?.userId === userId && pendingAction?.action === action
+  }
+
+  function isUserPending(userId) {
+    return pendingAction?.userId === userId
   }
 
   if (loadError) {
@@ -121,17 +136,19 @@ export function AdminOrganizersPage() {
                     type="button"
                     variant="outline"
                     onClick={() => reviewOrganizerRequest(request._id, 'approved')}
+                    disabled={isUserPending(request._id)}
                     className="border-emerald-500/30 px-3 py-2 text-xs font-semibold text-emerald-700"
                   >
-                    Approve
+                    {isUserActionPending(request._id, 'approved') ? 'Approving...' : 'Approve'}
                   </Button>
                   <Button
                     type="button"
                     variant="destructive"
                     onClick={() => reviewOrganizerRequest(request._id, 'rejected')}
+                    disabled={isUserPending(request._id)}
                     className="px-3 py-2 text-xs font-semibold"
                   >
-                    Reject
+                    {isUserActionPending(request._id, 'rejected') ? 'Rejecting...' : 'Reject'}
                   </Button>
                 </div>
               </div>
@@ -172,9 +189,10 @@ export function AdminOrganizersPage() {
                     type="button"
                     variant="destructive"
                     onClick={() => removeOrganizerAccess(organizer._id)}
+                    disabled={isUserPending(organizer._id)}
                     className="px-3 py-2 text-xs font-semibold"
                   >
-                    Remove organizer
+                    {isUserActionPending(organizer._id, 'remove') ? 'Removing...' : 'Remove organizer'}
                   </Button>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Info, LogOut, Mail, Menu, Moon, Settings, Sun, Ticket } from 'lucide-react'
+import { Info, LogOut, Mail, Menu, Moon, QrCode, Settings, ShieldCheck, Sun, Ticket } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet'
 import { buttonVariants } from '@/components/ui/button'
 import { useAuth } from '@/context/useAuth'
+import { supportEmail } from '@/lib/constants'
 import { getAvatarUrl, getOrganizerLink, getUserInitial } from '@/lib/user'
 import { cn } from '@/lib/utils'
 import { getApiErrorMessage } from '@/services/api'
@@ -44,7 +45,7 @@ export function Shell({ children, theme, onToggleTheme }) {
   }
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-normal">
@@ -185,7 +186,101 @@ export function Shell({ children, theme, onToggleTheme }) {
           </Sheet>
         </div>
       </header>
-      {children}
-    </>
+      <div className="flex-1">
+        {children}
+      </div>
+      <Footer organizerLink={organizerLink} />
+    </div>
+  )
+}
+
+function Footer({ organizerLink }) {
+  const year = new Date().getFullYear()
+  const footerLinks = [
+    {
+      title: 'Explore',
+      links: [
+        { to: '/events', label: 'Events' },
+        { to: '/bookings', label: 'My bookings' },
+        organizerLink,
+      ],
+    },
+    {
+      title: 'Support',
+      links: [
+        { to: '/about', label: 'About us' },
+        { to: '/contact', label: 'Contact us' },
+      ],
+    },
+  ]
+
+  const trustItems = [
+    { icon: ShieldCheck, label: 'Secure payments' },
+    { icon: QrCode, label: 'QR ticket delivery' },
+    { icon: Ticket, label: 'Managed event inventory' },
+  ]
+
+  return (
+    <footer className="mt-10 border-t border-border bg-card/60">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr] lg:px-8">
+        <div className="max-w-md">
+          <Link to="/" className="inline-flex items-center gap-2 text-lg font-semibold tracking-normal text-foreground">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <Ticket size={20} />
+            </span>
+            Ticketo
+          </Link>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Discover events, reserve seats, and manage bookings in one focused flow.
+          </p>
+          <a
+            href={`mailto:${supportEmail}`}
+            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+          >
+            <Mail size={16} />
+            {supportEmail}
+          </a>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          {footerLinks.map((group) => (
+            <div key={group.title}>
+              <h2 className="text-sm font-semibold text-foreground">{group.title}</h2>
+              <div className="mt-3 grid gap-2">
+                {group.links.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Built for reliable booking</h2>
+          <div className="mt-3 grid gap-2">
+            {trustItems.map(({ icon: Icon, label }) => (
+              <div key={label} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-primary">
+                  <Icon size={16} />
+                </span>
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-border">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-xs font-medium text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <span>© {year} Ticketo. All rights reserved.</span>
+          <span>Event discovery, reservations, and ticket confirmations.</span>
+        </div>
+      </div>
+    </footer>
   )
 }

@@ -47,6 +47,7 @@ export function ManageEventsPage({ scope = 'admin' }) {
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [pendingAction, setPendingAction] = useState(null)
   const {
     register: registerEventField,
     handleSubmit: handleEventSubmit,
@@ -108,8 +109,25 @@ export function ManageEventsPage({ scope = 'admin' }) {
     resetEventForm(eventFormDefaults)
   }
 
+  async function getLatestOrganizerEvent(eventId) {
+    const { data } = await api.get(listPath)
+    const events = data.events || []
+    setRemoteEvents(events)
+    return events.find((event) => event._id === eventId)
+  }
+
   async function submitEvent(values) {
     try {
+      if (editingEvent && isOrganizer) {
+        const latestEvent = await getLatestOrganizerEvent(editingEvent._id)
+
+        if (!latestEvent || !organizerEditableStatuses.includes(latestEvent.status)) {
+          toast.error('This event is already in review or published and cannot be updated.')
+          closeEventForm()
+          return
+        }
+      }
+
       let poster
       const posterFile = values.posterFile?.[0]
 
@@ -132,7 +150,6 @@ export function ManageEventsPage({ scope = 'admin' }) {
         startsAt: values.startsAt,
         priceFrom: values.priceFrom,
         totalSeats: values.totalSeats,
-        status: values.status,
       }
 
       if (poster) {
@@ -164,22 +181,31 @@ export function ManageEventsPage({ scope = 'admin' }) {
   }
 
   async function submitOrganizerDraft(eventId) {
+    setPendingAction({ eventId, action: 'submit' })
     try {
       await api.patch(`/events/organizer/${eventId}/submit`)
       toast.success('Event submitted for review')
+      if (editingEvent?._id === eventId) {
+        closeEventForm()
+      }
       loadEvents()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
+    } finally {
+      setPendingAction(null)
     }
   }
 
   async function publishOrganizerEvent(eventId) {
+    setPendingAction({ eventId, action: 'publishOrganizer' })
     try {
       await api.patch(`/events/organizer/${eventId}/publish`)
       toast.success('Event published')
       loadEvents()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -191,12 +217,15 @@ export function ManageEventsPage({ scope = 'admin' }) {
       return
     }
 
+    setPendingAction({ eventId, action: status })
     try {
       await api.patch(`/events/${eventId}/review`, { status, reviewNote: reviewNote || '' })
       toast.success(`Event ${formatEventStatus(status).toLowerCase()}`)
       loadEvents()
     } catch (error) {
       toast.error(getApiErrorMessage(error))
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -232,6 +261,14 @@ export function ManageEventsPage({ scope = 'admin' }) {
     sold: event.totalSeats ? Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100) : 0,
     raw: event,
   }))
+  function isActionPending(eventId, action) {
+    return pendingAction?.eventId === eventId && pendingAction?.action === action
+  }
+
+  function isEventActionPending(eventId) {
+    return pendingAction?.eventId === eventId
+  }
+
   const organizerSummary = organizerSections.map((section) => ({
     ...section,
     count: rows.filter((event) => section.statuses.includes(event.status)).length,
@@ -438,9 +475,10 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => submitOrganizerDraft(event.id)}
+                          disabled={isEventActionPending(event.id)}
                           className="px-3 py-2 font-medium"
                         >
-                          Submit
+                          {isActionPending(event.id, 'submit') ? 'Submitting...' : 'Submit'}
                         </Button>
                       )}
                       {event.canPublishOrganizer && (
@@ -448,9 +486,10 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           variant="outline"
                           type="button"
                           onClick={() => publishOrganizerEvent(event.id)}
+                          disabled={isEventActionPending(event.id)}
                           className="border-emerald-500/30 px-3 py-2 font-medium text-emerald-700"
                         >
-                          Publish
+                          {isActionPending(event.id, 'publishOrganizer') ? 'Publishing...' : 'Publish'}
                         </Button>
                       )}
                       {event.canPublish && (
@@ -479,25 +518,28 @@ export function ManageEventsPage({ scope = 'admin' }) {
                             variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'approved')}
+                            disabled={isEventActionPending(event.id)}
                             className="border-emerald-500/30 px-3 py-2 font-medium text-emerald-700"
                           >
-                            Approve
+                            {isActionPending(event.id, 'approved') ? 'Approving...' : 'Approve'}
                           </Button>
                           <Button
                             variant="outline"
                             type="button"
                             onClick={() => reviewEvent(event.id, 'changes_requested')}
+                            disabled={isEventActionPending(event.id)}
                             className="border-amber-500/30 px-3 py-2 font-medium text-amber-700"
                           >
-                            Changes
+                            {isActionPending(event.id, 'changes_requested') ? 'Saving...' : 'Changes'}
                           </Button>
                           <Button
                             type="button"
                             variant="destructive"
                             onClick={() => reviewEvent(event.id, 'rejected')}
+                            disabled={isEventActionPending(event.id)}
                             className="px-3 py-2 font-medium"
                           >
-                            Reject
+                            {isActionPending(event.id, 'rejected') ? 'Rejecting...' : 'Reject'}
                           </Button>
                         </>
                       )}

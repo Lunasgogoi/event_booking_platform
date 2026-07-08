@@ -107,6 +107,7 @@ const bookingSchema = new mongoose.Schema(
     confirmedAt: Date,
     cancelledAt: Date,
     expiresAt: Date,
+    hiddenFromUserAt: Date,
   },
   {
     timestamps: true,

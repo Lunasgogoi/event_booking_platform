@@ -542,6 +542,98 @@ test('organizer draft submission and zero-fee publish workflow', { timeout: 3000
   assert.equal(publishedListResponse.body.events.length, 1)
 })
 
+test('users can remove only closed bookings from My bookings', { timeout: 30000 }, async (t) => {
+  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+
+  const admin = await createUser('admin', 'admin-archive-booking')
+  const user = await createUser('user', 'user-archive-booking')
+  const baseEvent = {
+    description: 'A complete integration event payload for booking archive testing.',
+    category: 'Music',
+    venue: {
+      name: 'Archive Venue',
+      address: '123 Archive Street',
+      city: 'Mumbai',
+    },
+    priceFrom: 500,
+    totalSeats: 1,
+    availableSeats: 0,
+    seats: [{ number: 'G1', section: 'General', price: 500, status: 'booked' }],
+    status: 'published',
+    createdBy: admin._id,
+  }
+
+  const [futureEvent, pastEvent] = await Event.create([
+    {
+      ...baseEvent,
+      title: 'Future Archive Test Event',
+      slug: 'future-archive-test-event',
+      startsAt: futureDate(120),
+    },
+    {
+      ...baseEvent,
+      title: 'Past Archive Test Event',
+      slug: 'past-archive-test-event',
+      startsAt: new Date(Date.now() - 60 * 60 * 1000),
+    },
+  ])
+
+  const amount = {
+    subtotal: 500,
+    fees: 99,
+    total: 599,
+    currency: 'INR',
+  }
+
+  const [futureBooking, pastBooking] = await Booking.create([
+    {
+      bookingCode: 'BK-FUTURE-ARCHIVE',
+      user: user._id,
+      event: futureEvent._id,
+      seats: [{ number: 'G1', section: 'General', price: 500 }],
+      amount,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      confirmedAt: new Date(),
+    },
+    {
+      bookingCode: 'BK-PAST-ARCHIVE',
+      user: user._id,
+      event: pastEvent._id,
+      seats: [{ number: 'G1', section: 'General', price: 500 }],
+      amount,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      confirmedAt: new Date(),
+    },
+  ])
+
+  const blockedRemoveResponse = await api('DELETE', `/api/bookings/${futureBooking._id}`, {
+    headers: bearer(user._id),
+  })
+
+  assert.equal(blockedRemoveResponse.status, 400)
+  assert.equal(blockedRemoveResponse.body.message, 'Only cancelled or past event bookings can be removed')
+
+  const removeResponse = await api('DELETE', `/api/bookings/${pastBooking._id}`, {
+    headers: bearer(user._id),
+  })
+
+  assert.equal(removeResponse.status, 200)
+  assert.equal(removeResponse.body.message, 'Booking removed from My bookings')
+
+  const listResponse = await api('GET', '/api/bookings/my', {
+    headers: bearer(user._id),
+  })
+
+  assert.equal(listResponse.status, 200)
+  assert.equal(listResponse.body.bookings.length, 1)
+  assert.equal(listResponse.body.bookings[0].bookingCode, 'BK-FUTURE-ARCHIVE')
+
+  const hiddenBooking = await Booking.findById(pastBooking._id)
+  assert.ok(hiddenBooking.hiddenFromUserAt)
+})
+
 test('seat lock and release flow works against MongoDB and Redis', { timeout: 30000 }, async (t) => {
   if (!mongoAvailable) t.skip('MongoDB is unavailable')
   if (!redisAvailable) t.skip('Redis is unavailable')

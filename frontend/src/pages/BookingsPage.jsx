@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Ban, Download, Printer, Ticket } from 'lucide-react'
+import { Ban, Download, Printer, Ticket, Trash2 } from 'lucide-react'
 import { EmptyState, LoadingPanel, SectionTitle } from '@/components/shared'
 import { EventMeta, EventPoster } from '@/components/events'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +21,7 @@ export function BookingsPage() {
   const [userBookings, setUserBookings] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [cancelTarget, setCancelTarget] = useState(null)
+  const [removeTarget, setRemoveTarget] = useState(null)
 
   async function loadBookings() {
     setIsLoading(true)
@@ -125,6 +126,19 @@ export function BookingsPage() {
     }
   }
 
+  async function removeBooking() {
+    if (!removeTarget) return
+
+    try {
+      await api.delete(`/bookings/${removeTarget._id}`)
+      toast.success('Booking removed')
+      setRemoveTarget(null)
+      loadBookings()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    }
+  }
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <SectionTitle kicker="Account" title="My bookings" />
@@ -144,7 +158,13 @@ export function BookingsPage() {
         {!isLoading && userBookings.map((booking) => {
           const event = booking.event ? normalizeEvent(booking.event) : null
           const seatNumbers = booking.seats.map((seat) => seat.number)
+          const eventUnavailable = !event
+          const eventDateHasPassed = Boolean(event?.date && event.date <= new Date())
+          const eventIsClosed = ['cancelled', 'completed'].includes(event?.status)
+          const bookingIsClosed = ['cancelled', 'expired'].includes(booking.status)
           const canUseTicket = booking.status === 'confirmed' && Boolean(booking.qrCode?.dataUrl)
+          const canCancel = booking.status === 'confirmed' && !eventUnavailable && !eventDateHasPassed && !eventIsClosed
+          const canRemove = bookingIsClosed || eventUnavailable || eventIsClosed || eventDateHasPassed
           return (
             <article key={booking._id || booking.id} className="grid gap-4 rounded-lg border border-border bg-card p-4 md:grid-cols-[160px_1fr_auto]">
               <EventPoster event={event} className="h-36 w-full rounded-lg md:h-full" />
@@ -189,7 +209,7 @@ export function BookingsPage() {
                   >
                     <Printer size={15} /> Print
                   </Button>
-                  {booking.status === 'confirmed' && (
+                  {canCancel && (
                     <Button
                       type="button"
                       variant="destructive"
@@ -197,6 +217,16 @@ export function BookingsPage() {
                       className="px-3 py-2 text-sm font-semibold"
                     >
                       <Ban size={15} /> Cancel
+                    </Button>
+                  )}
+                  {canRemove && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setRemoveTarget(booking)}
+                      className="px-3 py-2 text-sm font-semibold"
+                    >
+                      <Trash2 size={15} /> Remove
                     </Button>
                   )}
                 </div>
@@ -229,6 +259,35 @@ export function BookingsPage() {
                 className="px-4 py-3 text-sm font-semibold"
               >
                 Cancel booking
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {removeTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-2xl">
+            <h2 className="text-xl font-semibold text-foreground">Remove booking?</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              This will remove booking <span className="font-semibold text-foreground">{removeTarget.bookingCode}</span>
+              from My bookings. The booking record stays available for payment and admin history.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRemoveTarget(null)}
+                className="px-4 py-3 text-sm font-semibold"
+              >
+                Keep booking
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={removeBooking}
+                className="px-4 py-3 text-sm font-semibold"
+              >
+                Remove booking
               </Button>
             </div>
           </div>
