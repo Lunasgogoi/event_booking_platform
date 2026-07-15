@@ -1,14 +1,23 @@
 # Event Booking Platform
 
-MERN event booking platform scaffold.
+Full-stack MERN event booking platform with public event discovery, role-based management, seat locking, Razorpay checkout, QR tickets, Cloudinary uploads, email notifications, and admin workflows.
 
 ## Structure
 
 - `frontend/` - React + Vite UI
-- `backend/` - Node.js, Express, MongoDB backend scaffold
+- `backend/` - Node.js, Express, MongoDB, Redis, Razorpay, Cloudinary, and email API
 - Root files only for repository-level docs and ignores
 
 There is no root `package.json`. Run frontend and backend commands from their own folders.
+
+## Tech Stack
+
+- Frontend: React, Vite, React Router, Tailwind CSS, Base UI, Axios
+- Backend: Node.js, Express, MongoDB/Mongoose, Redis, Zod, JWT, cookies
+- Payments: Razorpay order creation and server-side payment verification
+- Uploads: Cloudinary-backed event poster and user avatar uploads
+- Emails: Nodemailer for booking confirmations, support notifications, and organizer workflow updates
+- Tests: Node's built-in test runner for backend unit and route coverage
 
 ## Frontend
 
@@ -41,7 +50,7 @@ VITE_API_BASE_URL=http://localhost:5000/api
 
 ## Backend
 
-Current status: backend environment, app bootstrap, MongoDB, Redis, Razorpay payments, Cloudinary, email, cache, seat-lock config, data models, and auth APIs are scaffolded.
+Current status: working API with authentication, profiles, organizer requests, admin workflows, public and managed events, Redis-backed seat locking, Razorpay checkout, QR ticket generation, booking cancellation/removal, Cloudinary uploads, contact messages, email notifications, request validation, and backend tests.
 
 ```bash
 cd backend
@@ -52,7 +61,11 @@ npm run dev
 npm test
 ```
 
+On macOS/Linux, use `cp .env.example .env` instead of `copy .env.example .env`.
+
 `npm run dev` starts `src/server.js`, connects MongoDB, connects Redis, and exposes a health endpoint at `GET /health`.
+
+Backend module format: CommonJS. Request and environment validation use Zod schemas.
 
 Auth endpoints:
 
@@ -68,15 +81,23 @@ Auth endpoints:
 Event endpoints:
 
 - `GET /api/events`
-- `GET /api/events/:eventIdOrSlug`
 - `GET /api/events/admin/manage`
+- `GET /api/events/admin/review`
+- `GET /api/events/organizer/manage`
 - `POST /api/events/poster`
+- `POST /api/events/organizer`
 - `POST /api/events`
+- `GET /api/events/:eventId/seats`
+- `GET /api/events/:eventIdOrSlug`
+- `PATCH /api/events/organizer/:eventId/submit`
+- `PATCH /api/events/organizer/:eventId/publish`
+- `PATCH /api/events/organizer/:eventId`
+- `PATCH /api/events/:eventId/review`
 - `PATCH /api/events/:eventId`
 - `PATCH /api/events/:eventId/publish`
 - `PATCH /api/events/:eventId/cancel`
+- `DELETE /api/events/organizer/:eventId`
 - `DELETE /api/events/:eventId`
-- `GET /api/events/:eventId/seats`
 
 Seat-lock endpoints:
 
@@ -88,6 +109,7 @@ Booking endpoints:
 - `POST /api/bookings` - creates a Razorpay order for the selected locked seats
 - `POST /api/bookings/verify-payment` - verifies Razorpay payment signature and confirms the booking
 - `GET /api/bookings/my`
+- `DELETE /api/bookings/:bookingId` - hides a cancelled or past booking from My Bookings
 - `PATCH /api/bookings/:bookingId/cancel`
 
 Contact endpoints:
@@ -160,6 +182,6 @@ Useful production checks:
 - Deploy the frontend from `frontend/` on Vercel. `frontend/vercel.json` rewrites browser routes to `index.html`.
 - Deploy the backend from `backend/` on Render with `npm install` as the build command and `npm start` as the start command.
 
-Planned backend features:
+Planned improvements:
 
 - Broader integration tests for cancellation, support messages, and upload edge cases

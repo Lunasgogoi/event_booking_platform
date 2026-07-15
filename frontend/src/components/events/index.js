@@ -1,4 +1,5 @@
 export { CategoryStrip } from './CategoryStrip'
+export { ComingSoonCard } from './ComingSoonCard'
 export { EventCard } from './EventCard'
 export { EventGrid } from './EventGrid'
 export { EventMeta } from './EventMeta'

@@ -12,6 +12,22 @@ const seatSchema = new mongoose.Schema(
       default: 'General',
       trim: true,
     },
+    sectionCode: {
+      type: String,
+      default: 'GEN',
+      trim: true,
+      uppercase: true,
+    },
+    row: {
+      type: String,
+      default: 'A',
+      trim: true,
+      uppercase: true,
+    },
+    position: {
+      type: Number,
+      min: 1,
+    },
     price: {
       type: Number,
       required: true,
@@ -21,6 +37,47 @@ const seatSchema = new mongoose.Schema(
       type: String,
       enum: ['available', 'booked', 'blocked'],
       default: 'available',
+    },
+  },
+  { _id: false },
+)
+
+const eventSectionSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 80,
+    },
+    code: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
+      maxlength: 8,
+    },
+    selectionMode: {
+      type: String,
+      enum: ['choose_seat', 'auto_assign'],
+      default: 'choose_seat',
+    },
+    rows: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 100,
+    },
+    seatsPerRow: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 200,
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
     },
   },
   { _id: false },
@@ -96,11 +153,24 @@ const eventSchema = new mongoose.Schema(
       min: 0,
     },
     seats: [seatSchema],
+    seatingMode: {
+      type: String,
+      enum: ['single', 'sections'],
+      default: 'single',
+    },
+    sections: {
+      type: [eventSectionSchema],
+      default: [],
+    },
     status: {
       type: String,
       enum: ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'rejected', 'published', 'cancelled', 'completed'],
       default: 'draft',
       index: true,
+    },
+    previewEnabled: {
+      type: Boolean,
+      default: false,
     },
     review: {
       submittedAt: Date,
@@ -148,6 +218,7 @@ const eventSchema = new mongoose.Schema(
 
 eventSchema.index({ title: 'text', description: 'text', 'venue.city': 'text' })
 eventSchema.index({ status: 1, startsAt: 1 })
+eventSchema.index({ status: 1, previewEnabled: 1, startsAt: 1 })
 eventSchema.index({ category: 1, startsAt: 1 })
 
 module.exports = mongoose.model('Event', eventSchema)

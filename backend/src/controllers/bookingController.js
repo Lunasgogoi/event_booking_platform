@@ -11,8 +11,9 @@ const {
   toRazorpayAmount,
   verifyPaymentSignature,
 } = require('../services/razorpayService')
-const { getSeatLockOwner, lockSeat, releaseSeatForUser, releaseSeatsForUser } = require('../services/seatLockService')
+const { getSeatLockOwner, getSeatLocks, lockSeat, releaseSeatForUser, releaseSeatsForUser } = require('../services/seatLockService')
 const env = require('../config/env')
+const { findAdjacentSeats, getSection, getSeatsForSection } = require('../utils/eventSeating')
 
 async function findBookableSeat(eventId, seatNumber) {
   if (!mongoose.Types.ObjectId.isValid(eventId)) {
@@ -84,6 +85,91 @@ async function releaseSeatLock(req, res, next) {
       success: true,
       message: 'Seat lock released',
     })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function autoAssignSeats(req, res, next) {
+  try {
+    const { eventId, sectionCode, quantity } = req.body
+
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      throw new ApiError(400, 'Invalid event id')
+    }
+
+    const event = await Event.findById(eventId)
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    ensureEventIsBookable(event)
+
+    const section = getSection(event, sectionCode)
+    if (!section) {
+      throw new ApiError(404, 'Section not found')
+    }
+
+    if (section.selectionMode !== 'auto_assign') {
+      throw new ApiError(400, 'This section requires customers to choose their seats')
+    }
+
+    const sectionSeats = getSeatsForSection(event, section.code)
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const locks = await getSeatLocks(event._id, sectionSeats.map((seat) => seat.number))
+      const unavailableSeatNumbers = new Set(locks.map((lock) => lock.seatNumber))
+      const candidateSeats = findAdjacentSeats(sectionSeats, quantity, unavailableSeatNumbers)
+
+      if (!candidateSeats.length) {
+        throw new ApiError(409, `No ${quantity} adjacent seats are currently available in ${section.name}`)
+      }
+
+      const acquiredSeatNumbers = []
+      let acquiredAll = true
+
+      for (const seat of candidateSeats) {
+        const locked = await lockSeat({
+          eventId: event._id,
+          seatNumber: seat.number,
+          userId: req.user._id,
+        })
+
+        if (!locked) {
+          acquiredAll = false
+          break
+        }
+
+        acquiredSeatNumbers.push(seat.number)
+      }
+
+      if (acquiredAll) {
+        return res.status(200).json({
+          success: true,
+          message: 'Best available adjacent seats assigned',
+          section,
+          seats: candidateSeats.map((seat) => ({
+            number: seat.number,
+            section: seat.section,
+            sectionCode: seat.sectionCode,
+            row: seat.row,
+            position: seat.position,
+            price: seat.price,
+          })),
+          lock: {
+            expiresInSeconds: env.SEAT_LOCK_TTL_SECONDS,
+          },
+        })
+      }
+
+      await releaseSeatsForUser({
+        eventId: event._id,
+        seatNumbers: acquiredSeatNumbers,
+        userId: req.user._id,
+      })
+    }
+
+    throw new ApiError(409, 'Seats changed while assigning them. Please try again')
   } catch (error) {
     next(error)
   }
@@ -552,6 +638,7 @@ async function cancelBooking(req, res, next) {
 }
 
 module.exports = {
+  autoAssignSeats,
   cancelBooking,
   createBookingOrder,
   getMyBookings,

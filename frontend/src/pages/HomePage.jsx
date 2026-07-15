@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarDays, Ticket } from 'lucide-react'
 import { EmptyState, LoadingPanel, SectionHeader } from '@/components/shared'
-import { CategoryStrip, EventGrid, EventMeta, EventPoster, SearchPanel } from '@/components/events'
+import { CategoryStrip, ComingSoonCard, EventGrid, EventMeta, EventPoster, SearchPanel } from '@/components/events'
 import { buttonVariants } from '@/components/ui/button'
 import { normalizeEvent } from '@/lib/events'
 import { cn } from '@/lib/utils'
@@ -10,24 +10,35 @@ import api from '@/services/api'
 
 export function HomePage() {
   const [featuredEvents, setFeaturedEvents] = useState([])
+  const [comingSoonEvents, setComingSoonEvents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const featuredEvent = featuredEvents[0]
 
   useEffect(() => {
-    async function loadFeaturedEvents() {
+    async function loadHomeEvents() {
       setIsLoading(true)
 
-      try {
-        const { data } = await api.get('/events', { params: { limit: 4 } })
-        setFeaturedEvents(data.events ? data.events.map(normalizeEvent) : [])
-      } catch {
+      const [publishedResult, comingSoonResult] = await Promise.allSettled([
+        api.get('/events', { params: { limit: 4 } }),
+        api.get('/events/coming-soon', { params: { limit: 4 } }),
+      ])
+
+      if (publishedResult.status === 'fulfilled') {
+        setFeaturedEvents(publishedResult.value.data.events?.map(normalizeEvent) || [])
+      } else {
         setFeaturedEvents([])
-      } finally {
-        setIsLoading(false)
       }
+
+      if (comingSoonResult.status === 'fulfilled') {
+        setComingSoonEvents(comingSoonResult.value.data.events?.map(normalizeEvent) || [])
+      } else {
+        setComingSoonEvents([])
+      }
+
+      setIsLoading(false)
     }
 
-    loadFeaturedEvents()
+    loadHomeEvents()
   }, [])
 
   return (
@@ -102,6 +113,22 @@ export function HomePage() {
           />
         )}
       </section>
+
+      {comingSoonEvents.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-5">
+            <h2 className="text-2xl font-semibold tracking-normal">Coming soon</h2>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">
+              Approved events preparing to open ticket sales.
+            </p>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {comingSoonEvents.map((event) => (
+              <ComingSoonCard key={event.mongoId} event={event} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   )
 }

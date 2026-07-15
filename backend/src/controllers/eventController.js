@@ -7,6 +7,13 @@ const { deleteAsset, uploadBuffer } = require('../services/cloudinaryService')
 const { sendEmail } = require('../services/emailService')
 const { getSeatLocks } = require('../services/seatLockService')
 const { ensureEventCanBePublished, ensureEventIsPublic } = require('../utils/eventLifecycle')
+const {
+  buildSeatsFromSections,
+  getEventSections,
+  getRowLabel,
+  getSection,
+  getSeatsForSection,
+} = require('../utils/eventSeating')
 
 const PUBLIC_EVENT_CACHE_TTL_SECONDS = 60
 
@@ -36,12 +43,48 @@ async function createUniqueSlug(title, eventId) {
 }
 
 function buildSeats(totalSeats, priceFrom) {
-  return Array.from({ length: totalSeats }, (_, index) => ({
-    number: `G${index + 1}`,
-    section: 'General',
-    price: priceFrom,
-    status: 'available',
-  }))
+  return Array.from({ length: totalSeats }, (_, index) => {
+    const rowIndex = Math.floor(index / 10)
+
+    return {
+      number: `G${index + 1}`,
+      section: 'General',
+      sectionCode: 'GEN',
+      row: getRowLabel(rowIndex),
+      position: (index % 10) + 1,
+      price: priceFrom,
+      status: 'available',
+    }
+  })
+}
+
+function buildEventInventory(payload) {
+  if (payload.seatingMode === 'sections') {
+    const sections = payload.sections || []
+    const seats = buildSeatsFromSections(sections)
+
+    return {
+      seatingMode: 'sections',
+      sections,
+      seats,
+      totalSeats: seats.length,
+      availableSeats: seats.length,
+      priceFrom: Math.min(...sections.map((section) => section.price)),
+    }
+  }
+
+  const seats = payload.seats?.length
+    ? payload.seats
+    : buildSeats(payload.totalSeats, payload.priceFrom)
+
+  return {
+    seatingMode: 'single',
+    sections: [],
+    seats,
+    totalSeats: seats.length,
+    availableSeats: seats.filter((seat) => seat.status === 'available').length,
+    priceFrom: payload.priceFrom,
+  }
 }
 
 function ensureObjectId(id) {
@@ -100,9 +143,20 @@ function calculatePublishingFee() {
 
 async function applyEventUpdates(event, payload) {
   const previousPosterPublicId = event.poster?.publicId
+  const seatingConfigurationChanged = payload.seatingMode !== undefined || payload.sections !== undefined
 
   if (payload.status && payload.status !== event.status) {
     throw new ApiError(400, 'Use the dedicated workflow endpoint to change event status')
+  }
+
+  if (seatingConfigurationChanged) {
+    if (!['draft', 'changes_requested', 'rejected'].includes(event.status)) {
+      throw new ApiError(400, 'Seating can only be changed before an event is approved or published')
+    }
+
+    if (event.seats.some((seat) => seat.status === 'booked')) {
+      throw new ApiError(409, 'Seating cannot be changed after seats have been booked')
+    }
   }
 
   Object.assign(event, payload)
@@ -111,7 +165,16 @@ async function applyEventUpdates(event, payload) {
     event.slug = await createUniqueSlug(payload.title, event._id)
   }
 
-  if (payload.seats?.length) {
+  if (seatingConfigurationChanged) {
+    const inventory = buildEventInventory({
+      ...payload,
+      priceFrom: payload.priceFrom ?? event.priceFrom,
+      totalSeats: payload.totalSeats ?? event.totalSeats,
+      sections: payload.sections ?? event.sections,
+      seatingMode: payload.seatingMode ?? event.seatingMode,
+    })
+    event.set(inventory)
+  } else if (payload.seats?.length) {
     event.totalSeats = payload.seats.length
     event.availableSeats = payload.seats.filter((seat) => seat.status === 'available').length
   } else if (payload.totalSeats && event.status === 'draft') {
@@ -138,15 +201,13 @@ async function applyEventUpdates(event, payload) {
 async function createEvent(req, res, next) {
   try {
     const payload = req.body
-    const seats = payload.seats?.length ? payload.seats : buildSeats(payload.totalSeats, payload.priceFrom)
+    const inventory = buildEventInventory(payload)
 
     const event = await Event.create({
       ...payload,
+      ...inventory,
       status: 'draft',
       slug: await createUniqueSlug(payload.title),
-      seats,
-      totalSeats: seats.length,
-      availableSeats: seats.filter((seat) => seat.status === 'available').length,
       createdBy: req.user._id,
     })
 
@@ -196,15 +257,13 @@ async function getOrganizerEvents(req, res, next) {
 async function createOrganizerEvent(req, res, next) {
   try {
     const payload = req.body
-    const seats = payload.seats?.length ? payload.seats : buildSeats(payload.totalSeats, payload.priceFrom)
+    const inventory = buildEventInventory(payload)
 
     const event = await Event.create({
       ...payload,
+      ...inventory,
       status: 'draft',
       slug: await createUniqueSlug(payload.title),
-      seats,
-      totalSeats: seats.length,
-      availableSeats: seats.filter((seat) => seat.status === 'available').length,
       createdBy: req.user._id,
     })
 
@@ -280,6 +339,7 @@ async function getPublishedEvents(req, res, next) {
 
     const [events, total] = await Promise.all([
       Event.find(query)
+        .select('-seats')
         .sort({ startsAt: 1 })
         .skip((pageNumber - 1) * pageSize)
         .limit(pageSize)
@@ -297,6 +357,41 @@ async function getPublishedEvents(req, res, next) {
         total,
         pages: Math.ceil(total / pageSize),
       },
+    }
+
+    await setCache(cacheKey, responseBody, PUBLIC_EVENT_CACHE_TTL_SECONDS).catch(() => null)
+
+    res.status(200).json(responseBody)
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function getComingSoonEvents(req, res, next) {
+  try {
+    const { limit = 4 } = req.query
+    const pageSize = Math.min(Math.max(Number(limit) || 4, 1), 12)
+    const cacheKey = buildCacheKey('events:public:coming-soon', { limit: pageSize })
+    const cachedResponse = await getCache(cacheKey).catch(() => null)
+
+    if (cachedResponse) {
+      return res.status(200).json(cachedResponse)
+    }
+
+    const events = await Event.find({
+      status: 'approved',
+      previewEnabled: true,
+      startsAt: { $gte: new Date() },
+    })
+      .select('title category venue.name venue.city startsAt poster.url')
+      .sort({ startsAt: 1 })
+      .limit(pageSize)
+      .lean()
+
+    const responseBody = {
+      success: true,
+      message: 'Coming soon events fetched successfully',
+      events,
     }
 
     await setCache(cacheKey, responseBody, PUBLIC_EVENT_CACHE_TTL_SECONDS).catch(() => null)
@@ -390,7 +485,7 @@ async function getEvent(req, res, next) {
     }
 
     const query = mongoose.Types.ObjectId.isValid(eventId) ? { _id: eventId } : { slug: eventId }
-    const event = await Event.findOne(query).populate('createdBy', 'name email')
+    const event = await Event.findOne(query).populate('createdBy', 'name')
 
     if (!event) {
       throw new ApiError(404, 'Event not found')
@@ -401,10 +496,14 @@ async function getEvent(req, res, next) {
     const cacheTtlSeconds = Number.isFinite(secondsUntilStart)
       ? Math.max(1, Math.min(PUBLIC_EVENT_CACHE_TTL_SECONDS, secondsUntilStart))
       : PUBLIC_EVENT_CACHE_TTL_SECONDS
+    const publicEvent = event.toObject()
+    publicEvent.sections = getEventSections(event)
+    delete publicEvent.seats
+
     const responseBody = {
       success: true,
       message: 'Event fetched successfully',
-      event,
+      event: publicEvent,
     }
 
     await setCache(cacheKey, responseBody, cacheTtlSeconds).catch(() => null)
@@ -418,27 +517,62 @@ async function getEvent(req, res, next) {
 async function getEventSeats(req, res, next) {
   try {
     const { eventId } = req.params
+    const { section: requestedSectionCode } = req.query
     ensureObjectId(eventId)
 
-    const event = await Event.findById(eventId).select('seats status startsAt')
+    const event = await Event.findById(eventId).select(
+      'seats sections seatingMode totalSeats availableSeats priceFrom status startsAt',
+    )
     if (!event) {
       throw new ApiError(404, 'Event not found')
     }
     ensureEventIsPublic(event)
 
+    const section = requestedSectionCode ? getSection(event, requestedSectionCode) : null
+    if (requestedSectionCode && !section) {
+      throw new ApiError(404, 'Section not found')
+    }
+
+    const sectionSeats = section ? getSeatsForSection(event, section.code) : event.seats
+    const normalizedSeats = sectionSeats.map((seat, index) => ({
+      number: seat.number,
+      section: seat.section,
+      sectionCode: seat.sectionCode,
+      row: event.seatingMode === 'sections' ? seat.row : getRowLabel(Math.floor(index / 10)),
+      position: event.seatingMode === 'sections' ? seat.position : (index % 10) + 1,
+      price: seat.price,
+      status: seat.status,
+    }))
+    let visibleSeats = normalizedSeats
+    let rowPagination = null
+
+    if (section) {
+      const pageNumber = Math.max(Number(req.query.page) || 1, 1)
+      const pageSize = Math.min(Math.max(Number(req.query.rows) || 8, 1), 20)
+      const rowNames = [...new Set(normalizedSeats.map((seat) => seat.row))]
+      const visibleRows = new Set(rowNames.slice((pageNumber - 1) * pageSize, pageNumber * pageSize))
+      visibleSeats = normalizedSeats.filter((seat) => visibleRows.has(seat.row))
+      rowPagination = {
+        page: pageNumber,
+        limit: pageSize,
+        rows: rowNames.length,
+        pages: Math.ceil(rowNames.length / pageSize),
+      }
+    }
+
     const locks = await getSeatLocks(
       event._id,
-      event.seats.map((seat) => seat.number),
+      visibleSeats.map((seat) => seat.number),
     )
     const lockedSeatNumbers = new Set(locks.map((lock) => lock.seatNumber))
 
     res.status(200).json({
       success: true,
       message: 'Event seats fetched successfully',
-      seats: event.seats.map((seat) => ({
-        number: seat.number,
-        section: seat.section,
-        price: seat.price,
+      section,
+      pagination: rowPagination,
+      seats: visibleSeats.map((seat) => ({
+        ...seat,
         status: lockedSeatNumbers.has(seat.number) && seat.status === 'available' ? 'locked' : seat.status,
       })),
     })
@@ -487,6 +621,41 @@ async function updateOrganizerEvent(req, res, next) {
     res.status(200).json({
       success: true,
       message: 'Draft event updated successfully',
+      event,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function updateOrganizerEventPreview(req, res, next) {
+  try {
+    const { eventId } = req.params
+    const { enabled } = req.body
+    ensureObjectId(eventId)
+
+    const event = await Event.findById(eventId)
+    if (!event) {
+      throw new ApiError(404, 'Event not found')
+    }
+
+    ensureEventOwner(req, event)
+
+    if (event.status !== 'approved') {
+      throw new ApiError(400, 'Only approved events can be shown as coming soon')
+    }
+
+    if (enabled) {
+      ensureEventCanBePublished(event)
+    }
+
+    event.previewEnabled = enabled
+    await event.save()
+    await clearEventCaches()
+
+    res.status(200).json({
+      success: true,
+      message: enabled ? 'Event preview enabled successfully' : 'Event preview disabled successfully',
       event,
     })
   } catch (error) {
@@ -760,6 +929,7 @@ module.exports = {
   deleteOrganizerEvent,
   uploadEventPoster,
   getAdminReviewEvents,
+  getComingSoonEvents,
   getPublishedEvents,
   getAdminEvents,
   getOrganizerEvents,
@@ -767,6 +937,7 @@ module.exports = {
   getEventSeats,
   updateEvent,
   updateOrganizerEvent,
+  updateOrganizerEventPreview,
   reviewOrganizerEvent,
   submitOrganizerEvent,
   publishEvent,

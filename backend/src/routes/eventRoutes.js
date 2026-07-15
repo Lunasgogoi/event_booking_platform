@@ -7,6 +7,7 @@ const {
   deleteEvent,
   getAdminEvents,
   getAdminReviewEvents,
+  getComingSoonEvents,
   getEvent,
   getEventSeats,
   getOrganizerEvents,
@@ -18,16 +19,18 @@ const {
   uploadEventPoster,
   updateEvent,
   updateOrganizerEvent,
+  updateOrganizerEventPreview,
 } = require('../controllers/eventController')
 const { protect } = require('../middlewares/authMiddleware')
 const { restrictTo } = require('../middlewares/roleMiddleware')
 const upload = require('../middlewares/uploadMiddleware')
 const validateRequest = require('../middlewares/validateRequest')
-const { createEventSchema, reviewEventSchema, updateEventSchema } = require('../validators/eventValidator')
+const { createEventSchema, reviewEventSchema, updateEventPreviewSchema, updateEventSchema } = require('../validators/eventValidator')
 
 const router = express.Router()
 
 router.get('/', getPublishedEvents)
+router.get('/coming-soon', getComingSoonEvents)
 router.get('/admin/manage', protect, restrictTo('admin'), getAdminEvents)
 router.get('/admin/review', protect, restrictTo('admin'), getAdminReviewEvents)
 router.get('/organizer/manage', protect, restrictTo('organizer'), getOrganizerEvents)
@@ -38,6 +41,7 @@ router.get('/:eventId/seats', getEventSeats)
 router.get('/:eventId', getEvent)
 router.patch('/organizer/:eventId/submit', protect, restrictTo('organizer'), submitOrganizerEvent)
 router.patch('/organizer/:eventId/publish', protect, restrictTo('organizer'), publishOrganizerEvent)
+router.patch('/organizer/:eventId/preview', protect, restrictTo('organizer'), validateRequest(updateEventPreviewSchema), updateOrganizerEventPreview)
 router.patch('/organizer/:eventId', protect, restrictTo('organizer'), validateRequest(updateEventSchema), updateOrganizerEvent)
 router.patch('/:eventId/review', protect, restrictTo('admin'), validateRequest(reviewEventSchema), reviewOrganizerEvent)
 router.patch('/:eventId', protect, restrictTo('admin'), validateRequest(updateEventSchema), updateEvent)

@@ -12,9 +12,9 @@ const {
   reviewOrganizerRequestSchema,
   updateUserRoleSchema,
 } = require('../src/validators/adminValidator')
-const { createBookingSchema, seatLockSchema, verifyPaymentSchema } = require('../src/validators/bookingValidator')
+const { autoAssignSeatsSchema, createBookingSchema, seatLockSchema, verifyPaymentSchema } = require('../src/validators/bookingValidator')
 const { createContactMessageSchema, updateContactMessageStatusSchema } = require('../src/validators/contactValidator')
-const { createEventSchema, reviewEventSchema } = require('../src/validators/eventValidator')
+const { createEventSchema, reviewEventSchema, updateEventPreviewSchema } = require('../src/validators/eventValidator')
 
 test('register schema accepts valid user payload', () => {
   const result = registerSchema.safeParse({
@@ -146,6 +146,45 @@ test('event schema rejects end date before start date', () => {
   assert.equal(result.success, false)
 })
 
+test('event schema accepts unique section seating configuration', () => {
+  const result = createEventSchema.safeParse({
+    title: 'Sectioned Arena Event',
+    description: 'A complete event with multiple assigned seating areas.',
+    category: 'Music',
+    venue: { name: 'Main Arena', address: '123 Main Street', city: 'Mumbai' },
+    startsAt: '2026-08-10T10:00:00.000Z',
+    priceFrom: 500,
+    totalSeats: 100,
+    seatingMode: 'sections',
+    sections: [
+      { name: 'Front', code: 'front', selectionMode: 'choose_seat', rows: 5, seatsPerRow: 10, price: 1000 },
+      { name: 'Back', code: 'back', selectionMode: 'auto_assign', rows: 5, seatsPerRow: 10, price: 500 },
+    ],
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(result.data.sections.map((section) => section.code), ['FRONT', 'BACK'])
+})
+
+test('event schema rejects duplicate section codes', () => {
+  const result = createEventSchema.safeParse({
+    title: 'Duplicate Section Event',
+    description: 'A complete event with invalid duplicate seating areas.',
+    category: 'Music',
+    venue: { name: 'Main Arena', address: '123 Main Street', city: 'Mumbai' },
+    startsAt: '2026-08-10T10:00:00.000Z',
+    priceFrom: 500,
+    totalSeats: 100,
+    seatingMode: 'sections',
+    sections: [
+      { name: 'Front', code: 'F', selectionMode: 'choose_seat', rows: 5, seatsPerRow: 10, price: 1000 },
+      { name: 'Far side', code: 'F', selectionMode: 'auto_assign', rows: 5, seatsPerRow: 10, price: 500 },
+    ],
+  })
+
+  assert.equal(result.success, false)
+})
+
 test('event review schema accepts approved review decisions', () => {
   const result = reviewEventSchema.safeParse({
     status: 'approved',
@@ -163,6 +202,11 @@ test('event review schema rejects publish decisions', () => {
   assert.equal(result.success, false)
 })
 
+test('event preview schema requires a boolean opt-in', () => {
+  assert.equal(updateEventPreviewSchema.safeParse({ enabled: true }).success, true)
+  assert.equal(updateEventPreviewSchema.safeParse({ enabled: 'true' }).success, false)
+})
+
 test('booking schema requires at least one seat', () => {
   const result = createBookingSchema.safeParse({
     eventId: '507f1f77bcf86cd799439011',
@@ -170,6 +214,11 @@ test('booking schema requires at least one seat', () => {
   })
 
   assert.equal(result.success, false)
+})
+
+test('automatic seat assignment limits group size', () => {
+  assert.equal(autoAssignSeatsSchema.safeParse({ eventId: 'event', sectionCode: 'FRONT', quantity: 4 }).success, true)
+  assert.equal(autoAssignSeatsSchema.safeParse({ eventId: 'event', sectionCode: 'FRONT', quantity: 11 }).success, false)
 })
 
 test('seat lock schema accepts event id and seat number', () => {

@@ -165,7 +165,7 @@ after(async () => {
 })
 
 test('auth register, login, and me work against MongoDB', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const registerResponse = await api('POST', '/api/auth/register', {
     body: {
@@ -199,7 +199,7 @@ test('auth register, login, and me work against MongoDB', { timeout: 30000 }, as
 })
 
 test('admin event lifecycle controls public visibility', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const admin = await createUser('admin', 'admin-lifecycle')
 
@@ -263,8 +263,46 @@ test('admin event lifecycle controls public visibility', { timeout: 30000 }, asy
   assert.equal(publicDetailResponse.status, 404)
 })
 
+test('sectioned events derive inventory and expose section summaries without the full seat map', { timeout: 30000 }, async (t) => {
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
+
+  const admin = await createUser('admin', 'admin-sectioned-event')
+  const createResponse = await api('POST', '/api/events', {
+    headers: bearer(admin._id),
+    body: eventPayload({
+      title: 'Sectioned Arena Event',
+      seatingMode: 'sections',
+      sections: [
+        { name: 'Front', code: 'FRONT', selectionMode: 'choose_seat', rows: 2, seatsPerRow: 3, price: 1200 },
+        { name: 'Back', code: 'BACK', selectionMode: 'auto_assign', rows: 2, seatsPerRow: 3, price: 500 },
+      ],
+    }),
+  })
+
+  assert.equal(createResponse.status, 201)
+  assert.equal(createResponse.body.event.totalSeats, 12)
+  assert.equal(createResponse.body.event.availableSeats, 12)
+  assert.equal(createResponse.body.event.priceFrom, 500)
+
+  const storedEvent = await Event.findById(createResponse.body.event._id)
+  assert.equal(storedEvent.seats.length, 12)
+  assert.deepEqual(storedEvent.seats.slice(0, 3).map((seat) => seat.number), ['FRONT-A1', 'FRONT-A2', 'FRONT-A3'])
+
+  const publishResponse = await api('PATCH', `/api/events/${storedEvent._id}/publish`, {
+    headers: bearer(admin._id),
+  })
+  assert.equal(publishResponse.status, 200)
+
+  const detailResponse = await api('GET', `/api/events/${storedEvent._id}`)
+  assert.equal(detailResponse.status, 200)
+  assert.equal('seats' in detailResponse.body.event, false)
+  assert.equal(detailResponse.body.event.sections.length, 2)
+  assert.equal(detailResponse.body.event.sections[0].availableSeats, 6)
+  assert.equal(detailResponse.body.event.sections[1].selectionMode, 'auto_assign')
+})
+
 test('admin user management lists and updates users', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const admin = await createUser('admin', 'admin-users')
   const user = await createUser('user', 'managed-user')
@@ -321,7 +359,7 @@ test('admin user management lists and updates users', { timeout: 30000 }, async 
 })
 
 test('organizer access request can be approved by admin', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const admin = await createUser('admin', 'admin-organizers')
   const user = await createUser('user', 'organizer-applicant')
@@ -389,7 +427,7 @@ test('organizer access request can be approved by admin', { timeout: 30000 }, as
 })
 
 test('organizers can manage only their own draft events', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const organizer = await createUser('organizer', 'draft-organizer')
   const otherOrganizer = await createUser('organizer', 'other-draft-organizer')
@@ -449,10 +487,11 @@ test('organizers can manage only their own draft events', { timeout: 30000 }, as
 })
 
 test('organizer draft submission and zero-fee publish workflow', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const admin = await createUser('admin', 'admin-event-review')
   const organizer = await createUser('organizer', 'event-review-organizer')
+  const otherOrganizer = await createUser('organizer', 'other-event-review-organizer')
 
   const createResponse = await api('POST', '/api/events/organizer', {
     headers: bearer(organizer._id),
@@ -522,6 +561,34 @@ test('organizer draft submission and zero-fee publish workflow', { timeout: 3000
   assert.equal(publicListResponse.status, 200)
   assert.equal(publicListResponse.body.events.length, 0)
 
+  const hiddenComingSoonResponse = await api('GET', '/api/events/coming-soon')
+  assert.equal(hiddenComingSoonResponse.status, 200)
+  assert.equal(hiddenComingSoonResponse.body.events.length, 0)
+
+  const blockedPreviewResponse = await api('PATCH', `/api/events/organizer/${eventId}/preview`, {
+    headers: bearer(otherOrganizer._id),
+    body: { enabled: true },
+  })
+  assert.equal(blockedPreviewResponse.status, 403)
+
+  const enablePreviewResponse = await api('PATCH', `/api/events/organizer/${eventId}/preview`, {
+    headers: bearer(organizer._id),
+    body: { enabled: true },
+  })
+  assert.equal(enablePreviewResponse.status, 200)
+  assert.equal(enablePreviewResponse.body.event.previewEnabled, true)
+
+  const comingSoonResponse = await api('GET', '/api/events/coming-soon')
+  assert.equal(comingSoonResponse.status, 200)
+  assert.equal(comingSoonResponse.body.events.length, 1)
+  assert.equal(comingSoonResponse.body.events[0].title, 'Reviewed Organizer Event')
+  assert.equal(comingSoonResponse.body.events[0].venue.city, 'Mumbai')
+  assert.equal('description' in comingSoonResponse.body.events[0], false)
+  assert.equal('priceFrom' in comingSoonResponse.body.events[0], false)
+  assert.equal('seats' in comingSoonResponse.body.events[0], false)
+  assert.equal('createdBy' in comingSoonResponse.body.events[0], false)
+  assert.equal('address' in comingSoonResponse.body.events[0].venue, false)
+
   const publishResponse = await api('PATCH', `/api/events/${eventId}/publish`, {
     headers: bearer(admin._id),
   })
@@ -537,13 +604,17 @@ test('organizer draft submission and zero-fee publish workflow', { timeout: 3000
   assert.equal(organizerPublishResponse.body.event.status, 'published')
   assert.ok(organizerPublishResponse.body.event.publishing.publishedAt)
 
+  const clearedComingSoonResponse = await api('GET', '/api/events/coming-soon')
+  assert.equal(clearedComingSoonResponse.status, 200)
+  assert.equal(clearedComingSoonResponse.body.events.length, 0)
+
   const publishedListResponse = await api('GET', '/api/events?search=Reviewed%20Organizer')
   assert.equal(publishedListResponse.status, 200)
   assert.equal(publishedListResponse.body.events.length, 1)
 })
 
 test('users can remove only closed bookings from My bookings', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
 
   const admin = await createUser('admin', 'admin-archive-booking')
   const user = await createUser('user', 'user-archive-booking')
@@ -635,8 +706,8 @@ test('users can remove only closed bookings from My bookings', { timeout: 30000 
 })
 
 test('seat lock and release flow works against MongoDB and Redis', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
-  if (!redisAvailable) t.skip('Redis is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
+  if (!redisAvailable) return t.skip('Redis is unavailable')
 
   const admin = await createUser('admin', 'admin-booking')
   const user = await createUser('user', 'user-booking')
@@ -675,8 +746,8 @@ test('seat lock and release flow works against MongoDB and Redis', { timeout: 30
 })
 
 test('booking order creation requires configured Razorpay after seat lock', { timeout: 30000 }, async (t) => {
-  if (!mongoAvailable) t.skip('MongoDB is unavailable')
-  if (!redisAvailable) t.skip('Redis is unavailable')
+  if (!mongoAvailable) return t.skip('MongoDB is unavailable')
+  if (!redisAvailable) return t.skip('Redis is unavailable')
 
   const admin = await createUser('admin', 'admin-confirm-booking')
   const user = await createUser('user', 'user-confirm-booking')

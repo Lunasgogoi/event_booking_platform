@@ -44,12 +44,15 @@ async function releaseSeatsForUser({ eventId, seatNumbers, userId }) {
 }
 
 async function getSeatLocks(eventId, seatNumbers) {
-  const locks = await Promise.all(
-    seatNumbers.map(async (seatNumber) => ({
-      seatNumber,
-      owner: await redisClient.get(seatLockKey(eventId, seatNumber)),
-    })),
+  if (!seatNumbers.length) return []
+
+  const owners = await redisClient.mGet(
+    seatNumbers.map((seatNumber) => seatLockKey(eventId, seatNumber)),
   )
+  const locks = seatNumbers.map((seatNumber, index) => ({
+    seatNumber,
+    owner: owners[index],
+  }))
 
   return locks.filter((lock) => lock.owner)
 }

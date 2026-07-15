@@ -4,6 +4,17 @@ import toast from 'react-hot-toast'
 import { Info, LogOut, Mail, Menu, Moon, QrCode, Settings, ShieldCheck, Sun, Ticket } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -21,6 +32,8 @@ import { ThemeToggle } from './ThemeToggle'
 
 export function Shell({ children, theme, onToggleTheme }) {
   const [open, setOpen] = useState(false)
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const navigate = useNavigate()
   const { isAuthenticated, logout, user } = useAuth()
   const isDark = theme === 'dark'
@@ -35,13 +48,22 @@ export function Shell({ children, theme, onToggleTheme }) {
   ].filter(Boolean)
 
   async function handleLogout() {
+    setIsLoggingOut(true)
+
     try {
       await logout()
+      setLogoutDialogOpen(false)
       navigate('/')
       toast.success('Logged out successfully')
     } catch (error) {
       toast.error(getApiErrorMessage(error))
+    } finally {
+      setIsLoggingOut(false)
     }
+  }
+
+  function requestLogout() {
+    setLogoutDialogOpen(true)
   }
 
   return (
@@ -75,7 +97,7 @@ export function Shell({ children, theme, onToggleTheme }) {
           <div className="hidden items-center gap-2 md:flex">
             <ThemeToggle isDark={isDark} onToggleTheme={onToggleTheme} />
             {isAuthenticated ? (
-              <ProfileMenu user={user} onLogout={handleLogout} />
+              <ProfileMenu user={user} onLogout={requestLogout} />
             ) : (
               <>
                 <Link
@@ -169,7 +191,7 @@ export function Shell({ children, theme, onToggleTheme }) {
                       type="button"
                       onClick={() => {
                         setOpen(false)
-                        handleLogout()
+                        requestLogout()
                       }}
                       className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-destructive hover:bg-destructive/10"
                     >
@@ -186,6 +208,40 @@ export function Shell({ children, theme, onToggleTheme }) {
           </Sheet>
         </div>
       </header>
+      <AlertDialog
+        open={logoutDialogOpen}
+        onOpenChange={(nextOpen) => {
+          if (!isLoggingOut) {
+            setLogoutDialogOpen(nextOpen)
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md rounded-lg p-5 shadow-2xl">
+          <AlertDialogHeader className="place-items-start text-left">
+            <AlertDialogMedia className="text-destructive">
+              <LogOut />
+            </AlertDialogMedia>
+            <AlertDialogTitle className="text-xl font-semibold text-foreground">Log out?</AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-6 text-muted-foreground">
+              Are you sure you want to log out of your Ticketo account?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="-mx-5 -mb-5 mt-1 flex flex-wrap justify-end gap-3 rounded-b border-t border-border bg-muted/40 p-5">
+            <AlertDialogCancel disabled={isLoggingOut} className="h-11 px-4 py-3 text-sm font-semibold">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              variant="destructive"
+              className="h-11 px-4 py-3 text-sm font-semibold"
+            >
+              {isLoggingOut ? 'Logging out...' : 'Log out'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="flex-1">
         {children}
       </div>

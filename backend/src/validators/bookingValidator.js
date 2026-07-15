@@ -10,6 +10,12 @@ const createBookingSchema = z.object({
   seatNumbers: z.array(z.string().trim().min(1)).min(1, 'Select at least one seat').max(20),
 })
 
+const autoAssignSeatsSchema = z.object({
+  eventId: z.string().trim().min(1, 'Event id is required'),
+  sectionCode: z.string().trim().min(1, 'Section is required').max(8),
+  quantity: z.coerce.number().int().min(1).max(10),
+})
+
 const verifyPaymentSchema = createBookingSchema.extend({
   razorpay_order_id: z.string().trim().min(1, 'Razorpay order id is required'),
   razorpay_payment_id: z.string().trim().min(1, 'Razorpay payment id is required'),
@@ -17,6 +23,7 @@ const verifyPaymentSchema = createBookingSchema.extend({
 })
 
 module.exports = {
+  autoAssignSeatsSchema,
   createBookingSchema,
   seatLockSchema,
   verifyPaymentSchema,

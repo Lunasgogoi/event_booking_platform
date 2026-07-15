@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import toast from 'react-hot-toast'
-import { Edit3, Plus } from 'lucide-react'
+import { Edit3, Eye, EyeOff, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { SectionTitle } from '@/components/shared'
 import { EventPoster } from '@/components/events'
 import { AdminField } from '@/components/forms'
-import { eventFormDefaults } from '@/lib/constants'
+import { eventFormDefaults, eventSectionDefaults } from '@/lib/constants'
 import { formatEventStatus, formatINR } from '@/lib/formatters'
 import api, { getApiErrorMessage } from '@/services/api'
 
@@ -49,11 +49,23 @@ export function ManageEventsPage({ scope = 'admin' }) {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [pendingAction, setPendingAction] = useState(null)
   const {
+    control: eventFormControl,
     register: registerEventField,
     handleSubmit: handleEventSubmit,
     reset: resetEventForm,
     formState: { isSubmitting },
   } = useForm({ defaultValues: eventFormDefaults })
+  const {
+    fields: sectionFields,
+    append: appendEventSection,
+    remove: removeEventSection,
+  } = useFieldArray({
+    control: eventFormControl,
+    name: 'sections',
+  })
+  const seatingMode = useWatch({ control: eventFormControl, name: 'seatingMode' })
+  const watchedSections = useWatch({ control: eventFormControl, name: 'sections' }) || []
+  const canConfigureSeating = !editingEvent || organizerEditableStatuses.includes(editingEvent.status)
 
   const loadEvents = useCallback(async function loadEvents() {
     setIsLoading(true)
@@ -97,6 +109,17 @@ export function ManageEventsPage({ scope = 'admin' }) {
       priceFrom: event.priceFrom ?? '',
       totalSeats: event.totalSeats ?? '',
       status: event.status || 'draft',
+      seatingMode: event.seatingMode === 'sections' && event.sections?.length ? 'sections' : 'single',
+      sections: event.sections?.length
+        ? event.sections.map((section) => ({
+            name: section.name,
+            code: section.code,
+            selectionMode: section.selectionMode,
+            rows: section.rows,
+            seatsPerRow: section.seatsPerRow,
+            price: section.price,
+          }))
+        : [{ ...eventSectionDefaults }],
       posterFile: null,
     })
     setShowForm(true)
@@ -148,8 +171,27 @@ export function ManageEventsPage({ scope = 'admin' }) {
           city: values.city,
         },
         startsAt: values.startsAt,
-        priceFrom: values.priceFrom,
-        totalSeats: values.totalSeats,
+      }
+
+      const canUpdateSeating = !editingEvent || organizerEditableStatuses.includes(editingEvent.status)
+      if (canUpdateSeating && values.seatingMode === 'sections') {
+        const sections = values.sections.map((section) => ({
+          name: section.name,
+          code: section.code,
+          selectionMode: section.selectionMode,
+          rows: Number(section.rows),
+          seatsPerRow: Number(section.seatsPerRow),
+          price: Number(section.price),
+        }))
+        payload.seatingMode = 'sections'
+        payload.sections = sections
+        payload.totalSeats = sections.reduce((total, section) => total + section.rows * section.seatsPerRow, 0)
+        payload.priceFrom = Math.min(...sections.map((section) => section.price))
+      } else if (canUpdateSeating) {
+        payload.seatingMode = 'single'
+        payload.sections = []
+        payload.priceFrom = values.priceFrom
+        payload.totalSeats = values.totalSeats
       }
 
       if (poster) {
@@ -209,6 +251,19 @@ export function ManageEventsPage({ scope = 'admin' }) {
     }
   }
 
+  async function toggleEventPreview(eventId, enabled) {
+    setPendingAction({ eventId, action: 'preview' })
+    try {
+      await api.patch(`/events/organizer/${eventId}/preview`, { enabled })
+      toast.success(enabled ? 'Event added to Coming soon' : 'Event removed from Coming soon')
+      loadEvents()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error))
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
   async function reviewEvent(eventId, status) {
     const needsNote = status === 'changes_requested' || status === 'rejected'
     const reviewNote = needsNote ? window.prompt(status === 'changes_requested' ? 'What changes are needed?' : 'Why is this event rejected?') : ''
@@ -253,11 +308,13 @@ export function ManageEventsPage({ scope = 'admin' }) {
     canDelete: isOrganizer ? organizerEditableStatuses.includes(event.status) : !isReviewQueue,
     canSubmit: isOrganizer && organizerEditableStatuses.includes(event.status),
     canPublishOrganizer: isOrganizer && event.status === 'approved' && event.publishing?.paymentStatus !== 'pending',
+    canTogglePreview: isOrganizer && event.status === 'approved',
     canPublish: !isOrganizer && !isReviewQueue && event.status === 'draft' && event.createdBy?.role === 'admin',
     canCancel: !isOrganizer && !isReviewQueue && event.status === 'published',
     canMarkUnderReview: !isOrganizer && event.status === 'submitted',
     canReview: !isOrganizer && reviewDecisionStatuses.includes(event.status),
     publishing: event.publishing,
+    previewEnabled: Boolean(event.previewEnabled),
     sold: event.totalSeats ? Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100) : 0,
     raw: event,
   }))
@@ -356,8 +413,6 @@ export function ManageEventsPage({ scope = 'admin' }) {
             <AdminField label="City" registration={registerEventField('city', { required: true })} required />
             <AdminField label="Address" registration={registerEventField('address', { required: true })} required />
             <AdminField label="Start date" type="datetime-local" registration={registerEventField('startsAt', { required: true })} required />
-            <AdminField label="Price from" type="number" registration={registerEventField('priceFrom', { required: true, min: 0 })} required min="0" />
-            <AdminField label="Total seats" type="number" registration={registerEventField('totalSeats', { required: true, min: 1 })} required min="1" />
             <Label className="grid gap-2 text-sm font-semibold text-foreground">
               Poster image
               <Input
@@ -368,6 +423,94 @@ export function ManageEventsPage({ scope = 'admin' }) {
               />
             </Label>
           </div>
+          {canConfigureSeating ? (
+            <div className="mt-5 rounded-lg border border-border bg-muted/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <Label className="grid min-w-64 gap-2 text-sm font-semibold text-foreground">
+                  Seating setup
+                  <select
+                    {...registerEventField('seatingMode')}
+                    className="h-11 rounded-lg border border-input bg-background px-3 text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <option value="single">Single general section</option>
+                    <option value="sections">Multiple seating sections</option>
+                  </select>
+                </Label>
+                <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                  Use sections for areas such as Front, Side, Back, VIP, or Balcony. Each section can let customers choose seats or receive the best adjacent seats automatically.
+                </p>
+              </div>
+
+              {seatingMode === 'single' ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <AdminField label="Price per seat" type="number" registration={registerEventField('priceFrom', { required: true, min: 0 })} required min="0" />
+                  <AdminField label="Total seats" type="number" registration={registerEventField('totalSeats', { required: true, min: 1, max: 20000 })} required min="1" />
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-4">
+                  {sectionFields.map((sectionField, index) => {
+                    const section = watchedSections[index] || sectionField
+                    const capacity = Number(section.rows || 0) * Number(section.seatsPerRow || 0)
+
+                    return (
+                      <div key={sectionField.id} className="rounded-lg border border-border bg-card p-4">
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-foreground">Section {index + 1}</p>
+                            <p className="text-xs font-medium text-muted-foreground">{capacity.toLocaleString('en-IN')} configured seats</p>
+                          </div>
+                          {sectionFields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => removeEventSection(index)}
+                              className="px-3 py-2 text-sm font-medium text-destructive"
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <AdminField label="Section name" registration={registerEventField(`sections.${index}.name`, { required: true })} required />
+                          <AdminField label="Short code" registration={registerEventField(`sections.${index}.code`, { required: true, pattern: /^[a-z0-9]+$/i })} required />
+                          <Label className="grid gap-2 text-sm font-medium text-foreground">
+                            Seat selection
+                            <select
+                              {...registerEventField(`sections.${index}.selectionMode`, { required: true })}
+                              className="h-11 rounded-lg border border-input bg-muted/40 px-3 text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                            >
+                              <option value="choose_seat">Customer chooses seats</option>
+                              <option value="auto_assign">Auto-assign adjacent seats</option>
+                            </select>
+                          </Label>
+                          <AdminField label="Number of rows" type="number" registration={registerEventField(`sections.${index}.rows`, { required: true, min: 1, max: 100 })} required min="1" />
+                          <AdminField label="Seats per row" type="number" registration={registerEventField(`sections.${index}.seatsPerRow`, { required: true, min: 1, max: 200 })} required min="1" />
+                          <AdminField label="Price per seat" type="number" registration={registerEventField(`sections.${index}.price`, { required: true, min: 0 })} required min="0" />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => appendEventSection({
+                      ...eventSectionDefaults,
+                      name: `Section ${sectionFields.length + 1}`,
+                      code: `S${sectionFields.length + 1}`,
+                    })}
+                    disabled={sectionFields.length >= 20}
+                    className="w-fit px-4 py-3 text-sm font-semibold"
+                  >
+                    <Plus size={17} /> Add section
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+              Seating configuration is locked after an event enters review or is published.
+            </div>
+          )}
           <Label className="mt-4 grid gap-2 text-sm font-semibold text-foreground">
             Description
             <Textarea
@@ -452,9 +595,14 @@ export function ManageEventsPage({ scope = 'admin' }) {
                       {formatEventStatus(event.status)}
                     </Badge>
                     {isOrganizer && event.status === 'approved' && (
-                      <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        {event.publishing?.feeAmount > 0 ? `${formatINR(event.publishing.feeAmount)} due` : 'No publishing fee'}
-                      </p>
+                      <div className="mt-2 grid gap-1 text-xs font-semibold">
+                        <p className="text-emerald-700">
+                          {event.publishing?.feeAmount > 0 ? `${formatINR(event.publishing.feeAmount)} due` : 'No publishing fee'}
+                        </p>
+                        <p className={event.previewEnabled ? 'text-primary' : 'text-muted-foreground'}>
+                          {event.previewEnabled ? 'Shown in Coming soon' : 'Preview hidden'}
+                        </p>
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="px-4 py-4">{event.sold}%</TableCell>
@@ -490,6 +638,22 @@ export function ManageEventsPage({ scope = 'admin' }) {
                           className="border-emerald-500/30 px-3 py-2 font-medium text-emerald-700"
                         >
                           {isActionPending(event.id, 'publishOrganizer') ? 'Publishing...' : 'Publish'}
+                        </Button>
+                      )}
+                      {event.canTogglePreview && (
+                        <Button
+                          variant="outline"
+                          type="button"
+                          onClick={() => toggleEventPreview(event.id, !event.previewEnabled)}
+                          disabled={isEventActionPending(event.id)}
+                          className="px-3 py-2 font-medium"
+                        >
+                          {event.previewEnabled ? <EyeOff size={15} /> : <Eye size={15} />}
+                          {isActionPending(event.id, 'preview')
+                            ? 'Saving...'
+                            : event.previewEnabled
+                              ? 'Hide preview'
+                              : 'Show preview'}
                         </Button>
                       )}
                       {event.canPublish && (

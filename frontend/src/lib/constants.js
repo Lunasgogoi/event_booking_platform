@@ -11,6 +11,15 @@ export const contactCategories = [
 
 export const supportEmail = 'support@ticketo.events'
 
+export const eventSectionDefaults = {
+  name: 'Front section',
+  code: 'FRONT',
+  selectionMode: 'choose_seat',
+  rows: 5,
+  seatsPerRow: 10,
+  price: '',
+}
+
 export const eventFormDefaults = {
   title: '',
   description: '',
@@ -21,6 +30,8 @@ export const eventFormDefaults = {
   startsAt: '',
   priceFrom: '',
   totalSeats: '',
+  seatingMode: 'single',
+  sections: [eventSectionDefaults],
   status: 'draft',
   posterFile: null,
 }
