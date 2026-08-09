@@ -1,187 +1,503 @@
-# Event Booking Platform
+<div align="center">
 
-Full-stack MERN event booking platform with public event discovery, role-based management, seat locking, Razorpay checkout, QR tickets, Cloudinary uploads, email notifications, and admin workflows.
+# 🎟️ Ticketo - Event Booking Platform
 
-## Structure
+### A Modern Full-Stack MERN Event Booking Platform
 
-- `frontend/` - React + Vite UI
-- `backend/` - Node.js, Express, MongoDB, Redis, Razorpay, Cloudinary, and email API
-- Root files only for repository-level docs and ignores
+Discover events • Book seats • Secure Payments • QR Tickets • Organizer Dashboard • Admin Panel
 
-There is no root `package.json`. Run frontend and backend commands from their own folders.
+![MERN](https://img.shields.io/badge/MERN-Stack-green?style=for-the-badge)
+![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)
+![Node](https://img.shields.io/badge/Node.js-Express-success?style=for-the-badge&logo=node.js)
+![MongoDB](https://img.shields.io/badge/MongoDB-Database-darkgreen?style=for-the-badge&logo=mongodb)
+![Redis](https://img.shields.io/badge/Redis-Seat_Locking-red?style=for-the-badge&logo=redis)
+![Razorpay](https://img.shields.io/badge/Razorpay-Payments-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-## Tech Stack
+</div>
 
-- Frontend: React, Vite, React Router, Tailwind CSS, Base UI, Axios
-- Backend: Node.js, Express, MongoDB/Mongoose, Redis, Zod, JWT, cookies
-- Payments: Razorpay order creation and server-side payment verification
-- Uploads: Cloudinary-backed event poster and user avatar uploads
-- Emails: Nodemailer for booking confirmations, support notifications, and organizer workflow updates
-- Tests: Node's built-in test runner for backend unit and route coverage
+---
+
+# 📖 Overview
+
+Ticketo is a **production-ready MERN Event Booking Platform** that enables users to discover events, reserve seats using Redis-powered temporary seat locking, make secure online payments via Razorpay, and receive QR-code tickets instantly.
+
+The platform also includes complete **Organizer** and **Admin** dashboards for managing events, users, support requests, approvals, bookings, and analytics.
+
+---
+
+# ✨ Features
+
+## 👤 User
+
+- User Authentication (JWT + Cookies)
+- Register & Login
+- Edit Profile
+- Upload Avatar
+- Change Password
+- Browse Public Events
+- Search & Filter Events
+- Event Details Page
+- Redis Seat Locking
+- Razorpay Checkout
+- Booking Confirmation
+- QR Ticket Generation
+- Download QR Ticket
+- Print Ticket
+- Cancel Booking
+- Delete Past Bookings
+- Contact Support
+- Email Booking Confirmation
+
+---
+
+## 🎉 Organizer
+
+- Organizer Request Workflow
+- Create Events
+- Upload Event Posters
+- Edit Events
+- Publish Events
+- Submit Events for Review
+- Cancel Events
+- Delete Events
+- View Organizer Events
+
+---
+
+## 🛠️ Admin
+
+- Dashboard
+- Review Organizer Requests
+- Approve / Reject Organizers
+- Manage Users
+- Change User Roles
+- Remove Organizer Access
+- Suspend Users
+- Manage Events
+- Publish / Cancel Events
+- Delete Events
+- Support Inbox
+- Update Support Ticket Status
+
+---
+
+## ⚡ Technical Features
+
+- Redis Seat Locking
+- Secure JWT Authentication
+- Cookie-based Sessions
+- Server-side Payment Verification
+- QR Code Ticket Generation
+- Cloudinary Image Upload
+- Email Notifications
+- Zod Validation
+- REST API
+- Responsive UI
+- Production Ready Architecture
+
+---
+
+# 🏗️ Tech Stack
 
 ## Frontend
 
-Current status: connected UI with auth, profile settings, avatar upload, public event browsing, event detail, admin event management, Cloudinary poster uploads, Redis seat locking, Razorpay payment checkout, booking confirmation, QR tickets, booking cancellation, support contact, confirmation emails, and My Bookings connected to the backend.
+- React
+- Vite
+- React Router
+- Tailwind CSS
+- Base UI
+- Axios
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Included UI screens:
-
-- Home and event discovery
-- Search/filter events
-- Event details with Redis-backed temporary seat locking and Razorpay checkout for database events
-- Login/register UI
-- Profile menu, editable settings, password change, and avatar upload
-- My bookings with QR ticket display, QR download, print, and cancellation
-- Contact support form
-- Admin dashboard with support queue
-- Manage events with create, edit, publish, cancel, and safer delete confirmation
-- Cloudinary-backed event poster and avatar uploads
-
-Frontend environment:
-
-```bash
-VITE_API_BASE_URL=http://localhost:5000/api
-```
+---
 
 ## Backend
 
-Current status: working API with authentication, profiles, organizer requests, admin workflows, public and managed events, Redis-backed seat locking, Razorpay checkout, QR ticket generation, booking cancellation/removal, Cloudinary uploads, contact messages, email notifications, request validation, and backend tests.
+- Node.js
+- Express.js
+- MongoDB
+- Mongoose
+- Redis
+- JWT Authentication
+- Cookie Parser
+- Zod Validation
+
+---
+
+## Third Party Services
+
+- Razorpay
+- Cloudinary
+- Nodemailer
+
+---
+
+# 📂 Project Structure
+
+```
+Ticketo
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   └── vite.config.js
+│
+├── backend/
+│   ├── src/
+│   ├── uploads/
+│   ├── tests/
+│   └── server.js
+│
+├── postman/
+│
+└── README.md
+```
+
+---
+
+# 🚀 Getting Started
+
+## Clone Repository
+
+```bash
+git clone <repository-url>
+
+cd Ticketo
+```
+
+---
+
+# 💻 Frontend Setup
+
+```bash
+cd frontend
+
+npm install
+
+npm run dev
+```
+
+Frontend Environment
+
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+```
+
+---
+
+# ⚙️ Backend Setup
 
 ```bash
 cd backend
+
 npm install
+
+cp .env.example .env
+```
+
+Windows
+
+```bash
 copy .env.example .env
+```
+
+Seed Admin
+
+```bash
 npm run seed:admin
+```
+
+Start Development Server
+
+```bash
 npm run dev
+```
+
+Run Tests
+
+```bash
 npm test
 ```
 
-On macOS/Linux, use `cp .env.example .env` instead of `copy .env.example .env`.
+Health Check
 
-`npm run dev` starts `src/server.js`, connects MongoDB, connects Redis, and exposes a health endpoint at `GET /health`.
-
-Backend module format: CommonJS. Request and environment validation use Zod schemas.
-
-Auth endpoints:
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `PATCH /api/auth/me`
-- `PATCH /api/auth/avatar`
-- `PATCH /api/auth/password`
-- `POST /api/auth/organizer-request`
-
-Event endpoints:
-
-- `GET /api/events`
-- `GET /api/events/admin/manage`
-- `GET /api/events/admin/review`
-- `GET /api/events/organizer/manage`
-- `POST /api/events/poster`
-- `POST /api/events/organizer`
-- `POST /api/events`
-- `GET /api/events/:eventId/seats`
-- `GET /api/events/:eventIdOrSlug`
-- `PATCH /api/events/organizer/:eventId/submit`
-- `PATCH /api/events/organizer/:eventId/publish`
-- `PATCH /api/events/organizer/:eventId`
-- `PATCH /api/events/:eventId/review`
-- `PATCH /api/events/:eventId`
-- `PATCH /api/events/:eventId/publish`
-- `PATCH /api/events/:eventId/cancel`
-- `DELETE /api/events/organizer/:eventId`
-- `DELETE /api/events/:eventId`
-
-Seat-lock endpoints:
-
-- `POST /api/bookings/lock-seat`
-- `POST /api/bookings/release-seat`
-
-Booking endpoints:
-
-- `POST /api/bookings` - creates a Razorpay order for the selected locked seats
-- `POST /api/bookings/verify-payment` - verifies Razorpay payment signature and confirms the booking
-- `GET /api/bookings/my`
-- `DELETE /api/bookings/:bookingId` - hides a cancelled or past booking from My Bookings
-- `PATCH /api/bookings/:bookingId/cancel`
-
-Contact endpoints:
-
-- `POST /api/contact`
-
-Admin endpoints:
-
-- `GET /api/admin/dashboard`
-- `GET /api/admin/organizer-requests`
-- `PATCH /api/admin/organizer-requests/:userId/status`
-- `GET /api/admin/users`
-- `PATCH /api/admin/users/:userId/remove-organizer`
-- `PATCH /api/admin/users/:userId/role`
-- `PATCH /api/admin/users/:userId/status`
-- `GET /api/admin/contact-messages`
-- `PATCH /api/admin/contact-messages/:messageId/status`
-
-## Postman
-
-Import these files into Postman:
-
-- `postman/Event Booking Platform.postman_collection.json`
-- `postman/Event Booking Platform.postman_environment.json`
-
-The login/register requests automatically save the returned JWT into the `token` environment variable. The create event request saves `eventId` and `eventSlug`.
-
-Admin bootstrap:
-
-Set seed admin credentials in `backend/.env`, then run the seed script once.
-
-```bash
-SEED_ADMIN_NAME=Admin User
-SEED_ADMIN_EMAIL=admin@example.com
-SEED_ADMIN_PASSWORD=password123
-npm run seed:admin
+```
+GET /health
 ```
 
-The seed script creates that user if missing, or promotes the existing user with that email to the `admin` role. After that, admin login uses the normal `POST /api/auth/login` endpoint. Registration always creates regular users.
+---
 
-Required local services for the backend server:
+# 🔐 Environment Variables
 
-- MongoDB at `MONGO_URI`
-- Redis at `REDIS_URL`
+## Required
 
-Cloudinary variables are required for poster and avatar uploads. SMTP variables are optional in development; confirmation and support emails are skipped if SMTP is not configured, but support messages are still stored in MongoDB.
+```env
+MONGO_URI=
 
-Razorpay variables are required for paid bookings:
+REDIS_URL=
 
-```bash
+JWT_SECRET=
+
+CLIENT_URL=
+
+CLOUDINARY_CLOUD_NAME=
+
+CLOUDINARY_API_KEY=
+
+CLOUDINARY_API_SECRET=
+
 RAZORPAY_KEY_ID=
+
 RAZORPAY_KEY_SECRET=
+
 RAZORPAY_CURRENCY=INR
+
 RAZORPAY_BUSINESS_NAME=Ticketo
 ```
 
-The backend creates a Razorpay order before checkout, then confirms the booking only after server-side verification of `razorpay_payment_id`, `razorpay_order_id`, and `razorpay_signature`. Configure automatic payment capture in Razorpay so successful checkout payments reach the `captured` status before fulfilment.
+---
 
-Useful production checks:
+## Optional
 
-- Set a strong `JWT_SECRET`; the default is rejected in production.
-- Set `CLIENT_URL` to the deployed frontend URL so CORS and cookies work.
-- Set `CLIENT_URLS` to any additional comma-separated frontend origins, such as Vercel preview or custom domains.
-- Set `QR_CODE_BASE_URL` to the deployed ticket URL base.
-- Set `SUPPORT_EMAIL` to the admin/support inbox.
-- Set Razorpay live keys on the backend before accepting real payments.
-- Configure Cloudinary before enabling poster or avatar uploads.
-- Configure SMTP if booking confirmations and support notifications should be emailed.
-- Use HTTPS in production so secure cookies work correctly.
-- Deploy the frontend from `frontend/` on Vercel. `frontend/vercel.json` rewrites browser routes to `index.html`.
-- Deploy the backend from `backend/` on Render with `npm install` as the build command and `npm start` as the start command.
+```env
+SMTP_HOST=
 
-Planned improvements:
+SMTP_PORT=
 
-- Broader integration tests for cancellation, support messages, and upload edge cases
+SMTP_USER=
+
+SMTP_PASS=
+
+SUPPORT_EMAIL=
+
+QR_CODE_BASE_URL=
+```
+
+---
+
+# 🎫 Booking Workflow
+
+```text
+Select Event
+      │
+      ▼
+Lock Seats (Redis)
+      │
+      ▼
+Create Razorpay Order
+      │
+      ▼
+Payment Checkout
+      │
+      ▼
+Verify Payment
+      │
+      ▼
+Booking Created
+      │
+      ▼
+Generate QR Ticket
+      │
+      ▼
+Confirmation Email
+```
+
+---
+
+# 🔒 Authentication API
+
+| Method | Endpoint |
+|---------|----------|
+| POST | /api/auth/register |
+| POST | /api/auth/login |
+| POST | /api/auth/logout |
+| GET | /api/auth/me |
+| PATCH | /api/auth/me |
+| PATCH | /api/auth/avatar |
+| PATCH | /api/auth/password |
+| POST | /api/auth/organizer-request |
+
+---
+
+# 🎉 Event API
+
+| Method | Endpoint |
+|---------|----------|
+| GET | /api/events |
+| GET | /api/events/:eventIdOrSlug |
+| GET | /api/events/:eventId/seats |
+| POST | /api/events |
+| POST | /api/events/poster |
+| PATCH | /api/events/:eventId |
+| PATCH | /api/events/:eventId/publish |
+| PATCH | /api/events/:eventId/cancel |
+| DELETE | /api/events/:eventId |
+
+---
+
+# 💳 Booking API
+
+| Method | Endpoint |
+|---------|----------|
+| POST | /api/bookings/lock-seat |
+| POST | /api/bookings/release-seat |
+| POST | /api/bookings |
+| POST | /api/bookings/verify-payment |
+| GET | /api/bookings/my |
+| PATCH | /api/bookings/:bookingId/cancel |
+| DELETE | /api/bookings/:bookingId |
+
+---
+
+# 👑 Admin API
+
+- Dashboard
+- User Management
+- Organizer Requests
+- Event Moderation
+- Contact Messages
+- User Role Management
+
+---
+
+# 📮 Postman
+
+Import the following files into Postman.
+
+```
+postman/
+├── Event Booking Platform.postman_collection.json
+└── Event Booking Platform.postman_environment.json
+```
+
+The collection automatically stores
+
+- JWT Token
+- Event ID
+- Event Slug
+
+for subsequent requests.
+
+---
+
+# ☁️ Deployment
+
+## Frontend
+
+Deploy **frontend/** to
+
+- Vercel
+
+`frontend/vercel.json` already rewrites routes to `index.html`.
+
+---
+
+## Backend
+
+Deploy **backend/** to
+
+- Render
+
+Build Command
+
+```bash
+npm install
+```
+
+Start Command
+
+```bash
+npm start
+```
+
+---
+
+# ✅ Production Checklist
+
+- Strong JWT Secret
+- MongoDB Atlas
+- Redis Cloud
+- Razorpay Live Keys
+- Cloudinary Configured
+- SMTP Configured
+- HTTPS Enabled
+- Correct CLIENT_URL
+- Secure Cookies Enabled
+
+---
+
+# 🧪 Testing
+
+Backend uses the built-in Node.js Test Runner.
+
+Run
+
+```bash
+npm test
+```
+
+Current coverage includes
+
+- Authentication
+- Routes
+- Validation
+- Booking Flow
+
+---
+
+# 🚀 Future Improvements
+
+- Event Categories
+- Event Reviews
+- Wishlist
+- Coupon System
+- Real-time Notifications
+- Analytics Dashboard
+- Organizer Sales Reports
+- Social Login
+- Multi-language Support
+- PWA Support
+- Docker Deployment
+- CI/CD Pipeline
+
+---
+
+# 🤝 Contributing
+
+1. Fork the repository
+
+2. Create a new branch
+
+```bash
+git checkout -b feature/your-feature
+```
+
+3. Commit your changes
+
+```bash
+git commit -m "Add new feature"
+```
+
+4. Push your branch
+
+```bash
+git push origin feature/your-feature
+```
+
+5. Open a Pull Request
+
+---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+---
+
+<div align="center">
+
+### ⭐ If you found this project useful, consider giving it a Star!
+
+Made with ❤️ using the MERN Stack
+
+</div>
